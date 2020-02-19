@@ -37,14 +37,19 @@ setup(
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     license="GNU General Public License v3.0",
-    keywords=[],
+    keywords=["model-predictive-control", "mpc", "tensorflow2"],
     url="https://github.com/thiagopbueno/tf-mpc",
     packages=find_packages(),
     entry_points="""
         [console_scripts]
     """,
     python_requires=">=3.6",
-    install_requires=[],
+    install_requires=[
+        "tensorflow-cpu",
+        "tensorflow_probability",
+        "sklearn",
+        "pytest"
+    ],
     include_package_data=True,
     zip_safe=False,
     classifiers=[
