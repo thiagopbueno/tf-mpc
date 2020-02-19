@@ -1,0 +1,7 @@
+language: python
+python:
+  - "3.6"
+install:
+  - pip3 install -U tfmpc
+script:
+  - pytest -sv --disable-warnings 2>/dev/null
