@@ -4,4 +4,4 @@ python:
 install:
   - pip3 install -U tfmpc
 script:
-  - pytest -sv --disable-warnings 2>/dev/null
+  - pytest tests/ -sv --disable-warnings 2>/dev/null
