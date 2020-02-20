@@ -1,4 +1,4 @@
-# tf-mpc [![Build Status](https://travis-ci.org/thiagopbueno/tfmpc.svg?branch=master)](https://travis-ci.org/thiagopbueno/tfmpc) [![Documentation Status](https://readthedocs.org/projects/tfmpc/badge/?version=latest)](https://tfmpc.readthedocs.io/en/latest/?badge=latest) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/thiagopbueno/tfmpc/blob/master/LICENSE)
+# tf-mpc [![Build Status](https://travis-ci.org/thiagopbueno/tf-mpc.svg?branch=master)](https://travis-ci.org/thiagopbueno/tf-mpc) [![Documentation Status](https://readthedocs.org/projects/tfmpc/badge/?version=latest)](https://tfmpc.readthedocs.io/en/latest/?badge=latest) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/thiagopbueno/tf-mpc/blob/master/LICENSE)
 
 
 # Quickstart
