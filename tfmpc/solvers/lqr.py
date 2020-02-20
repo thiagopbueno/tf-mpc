@@ -7,19 +7,19 @@ for notation and more details on LQR.
 
 import tensorflow as tf
 
-import numpy as np
+
+def solve(lqr, x0, T):
+    policy, value_fn = backward(lqr, T)
+    states, actions, costs = forward(lqr, x0, T, policy)
+    return states, actions, costs
 
 
 def backward(lqr, T):
     policy, value_fn = [], []
 
-    n_dim = lqr.n_dim
     state_size = lqr.state_size
 
-    F = tf.constant(lqr.F, dtype=tf.float32)
-    f = tf.constant(lqr.f, dtype=tf.float32)
-    C = tf.constant(lqr.C, dtype=tf.float32)
-    c = tf.constant(lqr.c, dtype=tf.float32)
+    F, f, C, c = lqr.F, lqr.f, lqr.C, lqr.c
 
     V = tf.zeros((state_size, state_size))
     v = tf.zeros((state_size, 1))
@@ -68,26 +68,18 @@ def forward(lqr, x0, T, policy):
     actions = []
     costs = []
 
-    F = tf.constant(lqr.F, dtype=tf.float32)
-    f = tf.constant(lqr.f, dtype=tf.float32)
-    C = tf.constant(lqr.C, dtype=tf.float32)
-    c = tf.constant(lqr.c, dtype=tf.float32)
+    F, f, C, c = lqr.F, lqr.f, lqr.C, lqr.c
 
     state = tf.constant(x0, dtype=tf.float32)
+
     for t in range(T):
         K, k = policy[t]
         action = tf.matmul(K, state) + k
-        assert action.shape == (lqr.action_size, 1)
 
-        inputs = tf.concat([state, action], axis=0)
-
-        next_state = tf.matmul(F, inputs) + f
-
-        cost = 1 / 2 * tf.matmul(tf.matmul(tf.transpose(inputs), C), inputs) + \
-               tf.matmul(tf.transpose(inputs), c)
+        next_state = lqr.transition(state, action)
+        cost = lqr.cost(state, action)
 
         state = next_state
-        assert state.shape == (lqr.state_size, 1)
 
         states.append(next_state.numpy())
         actions.append(action.numpy())
