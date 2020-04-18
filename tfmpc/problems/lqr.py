@@ -1,3 +1,6 @@
+import json
+
+import numpy as np
 import tensorflow as tf
 
 
@@ -110,3 +113,18 @@ class LQR:
         costs = tf.stack(costs, axis=0)
 
         return states, actions, costs
+
+    def dump(self, file):
+        config = {
+            "F": self.F.numpy().tolist(),
+            "f": self.f.numpy().tolist(),
+            "C": self.C.numpy().tolist(),
+            "c": self.c.numpy().tolist()
+        }
+        json.dump(config, file)
+
+    @classmethod
+    def load(cls, file):
+        config = json.load(file)
+        config = {k: np.array(v).astype("f") for k, v in config.items()}
+        return cls(**config)

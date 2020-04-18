@@ -5,6 +5,7 @@ import pytest
 import tensorflow as tf
 
 from tfmpc.problems import make_lqr
+from tfmpc.problems.lqr import LQR
 
 
 @pytest.fixture
@@ -73,3 +74,16 @@ def test_forward(lqr):
 
         cost = 1 / 2 * np.dot(np.dot(inputs.T, C_t), inputs) + np.dot(c_t.T, inputs)
         assert np.allclose(cost, c[t], atol=1e-4)
+
+
+def test_dump_and_load(lqr):
+    tmpfile = "/tmp/config.json"
+
+    with open(tmpfile, "w") as file:
+        lqr.dump(file)
+
+    with open(tmpfile, "r") as file:
+        lqr2 = LQR.load(file)
+
+    for k in lqr.__dict__:
+        assert tf.reduce_all(getattr(lqr, k) == getattr(lqr2, k))
