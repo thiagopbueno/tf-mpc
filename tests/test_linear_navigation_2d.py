@@ -50,7 +50,7 @@ def test_backward(nav):
 
 def test_forward(nav):
     T = 10
-    x0 = np.random.normal(size=(nav.state_size, 1))
+    x0 = np.random.normal(size=(nav.state_size, 1)).astype("f")
 
     policy, _ = nav.backward(T)
 
