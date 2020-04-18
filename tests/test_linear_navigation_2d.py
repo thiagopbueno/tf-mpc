@@ -5,36 +5,63 @@ import pytest
 import tensorflow as tf
 
 from tfmpc.problems import make_lqr_linear_navigation
-from tfmpc.solvers.lqr import backward, forward
 
 
 @pytest.fixture
-def lqr():
+def nav():
     goal = np.array([[8.32], [-5.5]])
     beta = 10.0
     return make_lqr_linear_navigation(goal, beta)
 
 
-def test_backward(lqr):
+def test_make_lqr_linear_navigation(nav):
+    state_size = nav.state_size
+    action_size = nav.action_size
+    n_dim = state_size + action_size
+
+    F = nav.F
+    assert isinstance(F, tf.Tensor)
+    assert F.shape == (state_size, n_dim)
+
+    f = nav.f
+    assert isinstance(f, tf.Tensor)
+    assert f.shape == (state_size, 1)
+
+
+    C = nav.C
+    assert isinstance(C, tf.Tensor)
+    assert C.shape == (n_dim, n_dim)
+
+    C = C.numpy()
+    assert np.allclose(C.T, C, atol=1e-4)
+    np.linalg.cholesky(C)
+    assert np.all(np.linalg.eigvals(C) > 0)
+
+    c = nav.c
+    assert isinstance(c, tf.Tensor)
+    assert c.shape == (n_dim, 1)
+
+
+def test_backward(nav):
     T = 10
-    policy, value_fn = backward(lqr, T)
+    policy, value_fn = nav.backward(T)
     assert len(policy) == len(value_fn)
 
 
-def test_forward(lqr):
+def test_forward(nav):
     T = 10
-    x0 = np.random.normal(size=(lqr.state_size, 1))
+    x0 = np.random.normal(size=(nav.state_size, 1))
 
-    policy, _ = backward(lqr, T)
+    policy, _ = nav.backward(T)
 
-    x, u, c = forward(lqr, x0, T, policy)
+    x, u, c = nav.forward(policy, x0, T)
     assert len(x) == len(u) + 1 == len(c) + 1
     assert np.allclose(x[0], x0, atol=1e-4)
 
-    F_t = lqr.F.numpy()
-    f_t = lqr.f.numpy()
-    C_t = lqr.C.numpy()
-    c_t = lqr.c.numpy()
+    F_t = nav.F.numpy()
+    f_t = nav.f.numpy()
+    C_t = nav.C.numpy()
+    c_t = nav.c.numpy()
 
     for t in range(T):
         K, k = policy[t]
