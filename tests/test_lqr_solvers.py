@@ -15,7 +15,7 @@ def lqr():
 
 
 def test_solve(lqr):
-    x0 = np.random.normal(size=(lqr.state_size, 1))
+    x0 = np.random.normal(size=(lqr.state_size, 1)).astype("f")
     T = 10
     x, u, c = solve(lqr, x0, T)
     assert len(x) == len(u) + 1 == len(c) + 1

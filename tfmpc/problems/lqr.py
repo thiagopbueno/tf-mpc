@@ -33,6 +33,7 @@ class LQR:
         return 1 / 2 * tf.matmul(tf.matmul(inputs_transposed, self.C), inputs) + \
                tf.matmul(inputs_transposed, self.c)
 
+    @tf.function
     def backward(self, T):
         policy, value_fn = [], []
 
@@ -81,6 +82,7 @@ class LQR:
 
         return policy, value_fn
 
+    @tf.function
     def forward(self, policy, x0, T):
         states = [x0]
         actions = []
@@ -88,7 +90,7 @@ class LQR:
 
         F, f, C, c = self.F, self.f, self.C, self.c
 
-        state = tf.constant(x0, dtype=tf.float32)
+        state = x0
 
         for t in range(T):
             K, k = policy[t]
@@ -99,8 +101,12 @@ class LQR:
 
             state = next_state
 
-            states.append(next_state.numpy())
-            actions.append(action.numpy())
-            costs.append(cost.numpy())
+            states.append(next_state)
+            actions.append(action)
+            costs.append(cost)
+
+        states = tf.stack(states, axis=0)
+        actions = tf.stack(actions, axis=0)
+        costs = tf.stack(costs, axis=0)
 
         return states, actions, costs

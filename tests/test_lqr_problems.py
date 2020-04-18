@@ -50,7 +50,7 @@ def test_backward(lqr):
 
 def test_forward(lqr):
     T = 10
-    x0 = np.random.normal(size=(lqr.state_size, 1))
+    x0 = np.random.normal(size=(lqr.state_size, 1)).astype("f")
 
     policy, value_fn = lqr.backward(T)
 
