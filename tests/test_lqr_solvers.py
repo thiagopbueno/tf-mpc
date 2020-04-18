@@ -17,7 +17,6 @@ def lqr():
 def test_solve(lqr):
     x0 = np.random.normal(size=(lqr.state_size, 1)).astype("f")
     T = 10
-    x, u, c = solve(lqr, x0, T)
-    assert len(x) == len(u) + 1 == len(c) + 1
-
-
+    trajectory = solve(lqr, x0, T)
+    assert len(trajectory.states) == len(trajectory.actions) + 1
+    assert len(trajectory.states) == len(trajectory.costs) + 1

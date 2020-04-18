@@ -27,7 +27,6 @@ def test_make_lqr(lqr):
     assert isinstance(f, tf.Tensor)
     assert f.shape == (state_size, 1)
 
-
     C = lqr.C
     assert isinstance(C, tf.Tensor)
     assert C.shape == (n_dim, n_dim)
@@ -72,6 +71,5 @@ def test_forward(lqr):
         next_state = np.dot(F_t, inputs) + f_t
         assert np.allclose(next_state, x[t + 1], atol=1e-4)
 
-        cost = 1 / 2 * np.dot(np.dot(inputs.T, C_t), inputs) + \
-                np.dot(c_t.T, inputs)
+        cost = 1 / 2 * np.dot(np.dot(inputs.T, C_t), inputs) + np.dot(c_t.T, inputs)
         assert np.allclose(cost, c[t], atol=1e-4)

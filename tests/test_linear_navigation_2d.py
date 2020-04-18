@@ -27,7 +27,6 @@ def test_make_lqr_linear_navigation(nav):
     assert isinstance(f, tf.Tensor)
     assert f.shape == (state_size, 1)
 
-
     C = nav.C
     assert isinstance(C, tf.Tensor)
     assert C.shape == (n_dim, n_dim)
