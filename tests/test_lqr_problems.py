@@ -21,15 +21,15 @@ def test_make_lqr(lqr):
     n_dim = state_size + action_size
 
     F = lqr.F
-    assert isinstance(F, tf.Tensor)
+    assert isinstance(F, tf.Variable)
     assert F.shape == (state_size, n_dim)
 
     f = lqr.f
-    assert isinstance(f, tf.Tensor)
+    assert isinstance(f, tf.Variable)
     assert f.shape == (state_size, 1)
 
     C = lqr.C
-    assert isinstance(C, tf.Tensor)
+    assert isinstance(C, tf.Variable)
     assert C.shape == (n_dim, n_dim)
 
     C = C.numpy()
@@ -38,7 +38,7 @@ def test_make_lqr(lqr):
     assert np.all(np.linalg.eigvals(C) > 0)
 
     c = lqr.c
-    assert isinstance(c, tf.Tensor)
+    assert isinstance(c, tf.Variable)
     assert c.shape == (n_dim, 1)
 
 

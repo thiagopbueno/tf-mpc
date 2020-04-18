@@ -7,10 +7,10 @@ import tensorflow as tf
 class LQR:
 
     def __init__(self, F, f, C, c):
-        self.F = tf.constant(F, dtype=tf.float32)
-        self.f = tf.constant(f, dtype=tf.float32)
-        self.C = tf.constant(C, dtype=tf.float32)
-        self.c = tf.constant(c, dtype=tf.float32)
+        self.F = tf.Variable(F, trainable=False, dtype=tf.float32, name="F")
+        self.f = tf.Variable(f, trainable=False, dtype=tf.float32, name="f")
+        self.C = tf.Variable(C, trainable=False, dtype=tf.float32, name="C")
+        self.c = tf.Variable(c, trainable=False, dtype=tf.float32, name="c")
 
     @property
     def n_dim(self):
