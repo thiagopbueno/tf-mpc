@@ -76,6 +76,17 @@ def test_forward(lqr):
         assert np.allclose(cost, c[t], atol=1e-4)
 
 
+        V, v, const = value_fn[t]
+        V = V.numpy()
+        v = v.numpy()
+        const = const.numpy()
+
+        x_t = x[t].numpy()
+        value = const + 1 / 2 * np.dot(np.dot(x_t.T, V), x_t) + np.dot(v.T, x_t)
+        cost_to_go = np.sum(c[t:])
+        assert np.allclose(value, cost_to_go, atol=1e-4)
+
+
 def test_dump_and_load(lqr):
     tmpfile = "/tmp/config.json"
 
