@@ -46,6 +46,9 @@ class LQR:
 
         V = tf.zeros((state_size, state_size))
         v = tf.zeros((state_size, 1))
+        const = 0.0
+
+        value_fn.append((V, v, const))
 
         for t in reversed(range(T)):
             F_trans_V = tf.matmul(tf.transpose(F), V)
@@ -77,11 +80,28 @@ class LQR:
                 tf.matmul(tf.transpose(K), q_u) + \
                 tf.matmul(K_Q_uu, k)
 
+            V_, v_, _ = value_fn[-1]
+
+            k_trans = tf.transpose(k)
+            F_trans = tf.transpose(F)
+            f_trans = tf.transpose(f)
+            V_f = tf.matmul(V_, f)
+
+            W = C + tf.matmul(F_trans, tf.matmul(V_, F))
+            w = c + tf.matmul(F_trans, V_f) + tf.matmul(F_trans, v_)
+            W_uu = W[state_size:, state_size:]
+            w_u = w[state_size:]
+
+            const1 = 1 / 2 * tf.matmul(k_trans, tf.matmul(W_uu, k))
+            const2 = tf.matmul(k_trans, w_u)
+            const3 = 1/ 2 * tf.matmul(f_trans, V_f) + tf.matmul(f_trans, v_)
+            const += (const1 + const2 + const3)
+
             policy.append((K, k))
-            value_fn.append((V, v))
+            value_fn.append((V, v, const))
 
         policy = list(reversed(policy))
-        value_fn = list(reversed(value_fn))
+        value_fn = list(reversed(value_fn[1:]))
 
         return policy, value_fn
 
