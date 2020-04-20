@@ -75,6 +75,7 @@ def test_forward(lqr):
         cost = 1 / 2 * np.dot(np.dot(inputs.T, C_t), inputs) + np.dot(c_t.T, inputs)
         assert np.allclose(cost, c[t], atol=1e-4)
 
+
         V, v, const = value_fn[t]
         V = V.numpy()
         v = v.numpy()
