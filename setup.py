@@ -42,9 +42,11 @@ setup(
     packages=find_packages(),
     entry_points="""
         [console_scripts]
+        tfmpc=scripts.tfmpc:cli
     """,
     python_requires=">=3.6",
     install_requires=[
+        "Click",
         "tensorflow-cpu",
         "tensorflow_probability",
         "sklearn",
