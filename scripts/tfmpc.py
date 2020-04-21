@@ -26,6 +26,12 @@ def cli():
     default=10,
     help="The number of timesteps.")
 def lqr(initial_state, action_size, horizon):
+    """Generate and solve a randomly-created LQR problem.
+
+    Args:
+
+        initial_state: list of floats.
+    """
     initial_state = list(map(float, initial_state.split()))
     x0 = np.array(initial_state, dtype=np.float32)[:,np.newaxis]
     state_size = len(initial_state)
@@ -52,6 +58,14 @@ def lqr(initial_state, action_size, horizon):
     default=10,
     help="The number of timesteps.")
 def navlin(initial_state, goal, beta, horizon):
+    """Generate and solve the linear navigation LQR problem.
+
+    Args:
+
+        initial_state: list of floats.
+
+        goal: list of floats.
+    """
     initial_state = list(map(float, initial_state.split()))
     x0 = np.array(initial_state, dtype=np.float32)[:,np.newaxis]
 
