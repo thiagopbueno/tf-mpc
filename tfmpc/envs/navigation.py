@@ -9,6 +9,14 @@ class Navigation(DiffEnv):
         self.goal = goal
         self.beta = beta
 
+    @property
+    def action_size(self):
+        return self.state_size
+
+    @property
+    def state_size(self):
+        return self.goal.shape[0]
+
     @tf.function
     def transition(self, state, action):
         return state + action
