@@ -57,11 +57,20 @@ def test_backward(solver, initial_state, horizon):
 def test_forward(solver, initial_state, horizon):
     x, u = solver.start(initial_state, horizon)
     K, k = solver.backward(x, u)
-    states, actions = solver.forward(x, u, K, k)
+    states, actions, costs = solver.forward(x, u, K, k)
 
     assert states.shape == x.shape
     assert actions.shape == u.shape
+    assert costs.shape == [horizon]
 
     for t in range(horizon):
-        x, u = states[t], actions[t]
+        x, u, c = states[t], actions[t], costs[t]
         assert tf.reduce_all(states[t + 1] == solver.env.transition(x, u))
+        assert c == solver.env.cost(x, u)
+
+
+def test_solve(solver, initial_state, horizon):
+    trajectory, iterations = solver.solve(initial_state, horizon)
+    assert iterations == 2
+    print()
+    print(trajectory)
