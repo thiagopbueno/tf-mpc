@@ -51,29 +51,29 @@ def test_get_newton_step(qp):
         f, c = optimization._get_qp_indices(g, low, high, x)
 
         delta_x = tf.Variable(tf.zeros_like(x))
-        g_f = optimization._get_newton_step(H, q, x, f, c, delta_x)
+        H_ff, g_f = optimization._get_newton_step(H, q, x, f, c, delta_x)
 
 
 def test_projected_newton_qp(qp):
     H, q, low, high, x_star = qp
 
-    x, _, _ = optimization.projected_newton_qp(H, q, low, high, x_star)
+    x, _, _, _ = optimization.projected_newton_qp(H, q, low, high, x_star)
     assert tf.reduce_all(x == x_star)
 
     for _ in range(10):
         x_0 = tf.random.uniform(tf.shape(x_star), minval=low, maxval=high)
 
-        x, _, _ = optimization.projected_newton_qp(H, q, low, high, x_0)
+        x, _, _, _ = optimization.projected_newton_qp(H, q, low, high, x_0)
         assert tf.reduce_all(x == x_star)
 
         for i in range(x_0.shape[0]):
             x = tf.Variable(x_0, trainable=False)
             x[i].assign(low[i])
-            x, _, _ = optimization.projected_newton_qp(H, q, low, high, x)
+            x, _, _, _ = optimization.projected_newton_qp(H, q, low, high, x)
             assert tf.reduce_all(x == x_star)
 
         for i in range(x_0.shape[0]):
             x = tf.Variable(x_0, trainable=False)
             x[i].assign(high[i])
-            x, _, _ = optimization.projected_newton_qp(H, q, low, high, x)
+            x, _, _, _ = optimization.projected_newton_qp(H, q, low, high, x)
             assert tf.reduce_all(x == x_star)

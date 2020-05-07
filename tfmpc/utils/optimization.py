@@ -13,7 +13,7 @@ def projected_newton_qp(H, q, low, high, x, eps=1e-6, alpha_0=1.0, rho=0.5, c=1e
         free, clamped = _get_qp_indices(g, low, high, x)
 
         delta_x = tf.Variable(tf.zeros_like(x))
-        g_f = _get_newton_step(H, q, x, free, clamped, delta_x)
+        H_ff, g_f = _get_newton_step(H, q, x, free, clamped, delta_x)
 
         if tf.norm(g_f) < eps:
             break
@@ -21,7 +21,7 @@ def projected_newton_qp(H, q, low, high, x, eps=1e-6, alpha_0=1.0, rho=0.5, c=1e
         alpha = _armijo_line_search(f, x, g, delta_x, alpha_0, rho, c)
         x = tf.clip_by_value(x + alpha * delta_x, low, high)
 
-    return x, free, clamped
+    return x, H_ff, free, clamped
 
 
 def _armijo_line_search(f, x, g, delta_x, alpha_0=1.0, rho=0.5, c=1e-4):
@@ -74,10 +74,11 @@ def _get_newton_step(H, q, x, f, c, delta_x):
     if dim_c > 0:
         g_f += tf.matmul(H_fc, x_c)
 
-    delta_x_f = -tf.matmul(tf.linalg.inv(H_ff), g_f)
+    H_ff_inv = tf.linalg.inv(H_ff)
+    delta_x_f = -tf.matmul(H_ff_inv, g_f)
     delta_x_f = tf.reshape(delta_x_f, [-1])
 
     indices = tf.where(tf.cast(f, tf.bool))
     delta_x.scatter_nd_update(indices, delta_x_f)
 
-    return g_f
+    return H_ff_inv, g_f
