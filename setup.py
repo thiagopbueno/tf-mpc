@@ -1,4 +1,4 @@
-# This file is part of tf-mpc.
+]# This file is part of tf-mpc.
 
 # tf-mpc is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,6 +47,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "Click",
+        "gym",
         "tensorflow-cpu",
         "tensorflow_probability",
         "sklearn",
