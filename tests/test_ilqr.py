@@ -14,6 +14,15 @@ def solver():
 
 
 @pytest.fixture
+def box_solver():
+    goal = tf.constant([[5.5], [-9.0]])
+    beta = 0.0
+    low, high = -1.0, 1.0
+    env = navigation.Navigation(goal, beta, low, high)
+    return ilqr.iLQR(env)
+
+
+@pytest.fixture
 def initial_state():
     return tf.constant([[0.0], [0.0]])
 
@@ -72,5 +81,12 @@ def test_forward(solver, initial_state, horizon):
 def test_solve(solver, initial_state, horizon):
     trajectory, iterations = solver.solve(initial_state, horizon)
     assert iterations == 2
+    print()
+    print(trajectory)
+
+
+def test_box_solve(box_solver, initial_state, horizon):
+    trajectory, iterations = box_solver.solve(initial_state, horizon)
+    #assert iterations == 4
     print()
     print(trajectory)

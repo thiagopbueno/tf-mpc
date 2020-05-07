@@ -8,7 +8,7 @@ for algorithmic details and notation.
 
 import tensorflow as tf
 
-
+from tfmpc.utils import optimization
 from tfmpc.utils import trajectory
 
 
@@ -37,11 +37,17 @@ class iLQR:
         states = tf.TensorArray(dtype=tf.float32, size=T+1)
         actions = tf.TensorArray(dtype=tf.float32, size=T)
 
+        low = tf.constant(self.env.action_space.low)
+        minval = tf.where(tf.math.is_inf(low), -tf.ones_like(low), low)
+
+        high = tf.constant(self.env.action_space.high)
+        maxval = tf.where(tf.math.is_inf(high), tf.ones_like(high), high)
+
         states = states.write(0, x0)
 
         for t in tf.range(T):
             state = states.read(t)
-            action = tf.random.uniform(x0.shape, minval=-1.0, maxval=1.0)
+            action = tf.random.uniform(x0.shape, minval=minval, maxval=maxval)
             state = self.env.transition(state, action)
 
             actions = actions.write(t, action)
@@ -97,8 +103,7 @@ class iLQR:
             Q_reg, = tf.py_function(self._regularize, inp=[mu, self.Q_xu, f_x, f_u], Tout=[tf.float32])
             self.Q_xu.assign(Q_reg)
 
-            K_t = -tf.matmul(tf.linalg.inv(self.Q_uu), self.Q_ux)
-            k_t = -tf.matmul(tf.linalg.inv(self.Q_uu), self.Q_u)
+            K_t, k_t = tf.py_function(self._get_controller, inp=[action, self.Q_uu, self.Q_u, self.Q_ux], Tout=[tf.float32, tf.float32])
 
             K_t_trans_Q_uu = tf.matmul(tf.transpose(K_t), self.Q_uu)
 
@@ -157,6 +162,34 @@ class iLQR:
         traj = trajectory.Trajectory(x_hat, u_hat, c)
 
         return traj, iterations
+
+    def _get_controller(self, u, Q_uu, Q_u, Q_ux):
+        if not self.env.action_space.is_bounded():
+            K = -tf.matmul(tf.linalg.inv(Q_uu), Q_ux)
+            k = -tf.matmul(tf.linalg.inv(Q_uu), Q_u)
+        else:
+            low = self.env.action_space.low - u
+            high = self.env.action_space.high - u
+
+            k_0 = tf.zeros_like(u)
+            k, Q_uu_f_inv, f, c = optimization.projected_newton_qp(
+                Q_uu, Q_u, low, high, k_0)
+
+            action_dim = self.env.action_size
+            state_dim = self.env.state_size
+            K = tf.Variable(tf.zeros([action_dim, state_dim]))
+
+            n_free = tf.math.count_nonzero(tf.squeeze(f))
+            if n_free > 0:
+                Q_ux_f = Q_ux[tf.squeeze(f)]
+
+                indices = tf.where(tf.squeeze(f))
+                values = -tf.matmul(Q_uu_f_inv, Q_ux_f)
+                K.scatter_nd_update(indices, values)
+
+            K = tf.constant(K.numpy())
+
+        return K, k
 
     def _regularization_scheduler(self, Q, f1, f2):
         mu, mu_min = 0.0, 1e-6
