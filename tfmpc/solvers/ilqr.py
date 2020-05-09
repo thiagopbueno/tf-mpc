@@ -18,19 +18,11 @@ class iLQR:
         self.env = env
         self.atol = atol
 
-        self.Q_x = tf.Variable(tf.zeros([env.state_size, 1]), trainable=False)
-        self.Q_u = tf.Variable(tf.zeros([env.action_size, 1]), trainable=False)
-
-        self.Q_xx = tf.Variable(tf.zeros([env.state_size, env.state_size]), trainable=False)
-        self.Q_uu = tf.Variable(tf.zeros([env.action_size, env.action_size]), trainable=False)
-        self.Q_ux = tf.Variable(tf.zeros([env.action_size, env.state_size]), trainable=False)
-        self.Q_xu = tf.Variable(tf.zeros([env.state_size, env.action_size]), trainable=False)
-
-        self.Q_uu_reg = tf.Variable(tf.zeros([env.action_size, env.action_size]), trainable=False)
-        self.Q_xu_reg = tf.Variable(tf.zeros([env.state_size, env.action_size]), trainable=False)
-
         self.V_x = tf.Variable(tf.zeros([env.state_size, 1]), trainable=False)
         self.V_xx = tf.Variable(tf.zeros([env.state_size, env.state_size]), trainable=False)
+
+        self.J = tf.Variable(tf.zeros([]), trainable=False)
+        self.delta_J = tf.Variable(tf.zeros([]), trainable=False)
 
     @tf.function
     def start(self, x0, T):
@@ -87,37 +79,32 @@ class iLQR:
             f_x_trans = tf.transpose(f_x)
             f_u_trans = tf.transpose(f_u)
 
-            self.Q_x.assign(l_x + tf.matmul(f_x_trans, self.V_x))
-            self.Q_u.assign(l_u + tf.matmul(f_u_trans, self.V_x))
+            Q_x = l_x + tf.matmul(f_x_trans, self.V_x)
+            Q_u = l_u + tf.matmul(f_u_trans, self.V_x)
 
             f_x_trans_V_xx = tf.matmul(f_x_trans, self.V_xx)
             f_u_trans_V_xx = tf.matmul(f_u_trans, self.V_xx)
 
-            self.Q_xx.assign(l_xx + tf.matmul(f_x_trans_V_xx, f_x))
-            self.Q_uu.assign(l_uu + tf.matmul(f_u_trans_V_xx, f_u))
-            self.Q_ux.assign(l_ux + tf.matmul(f_u_trans_V_xx, f_x))
-            self.Q_xu.assign(l_xu + tf.matmul(f_x_trans_V_xx, f_u))
+            Q_xx = l_xx + tf.matmul(f_x_trans_V_xx, f_x)
+            Q_uu = l_uu + tf.matmul(f_u_trans_V_xx, f_u)
+            Q_ux = l_ux + tf.matmul(f_u_trans_V_xx, f_x)
+            Q_xu = l_xu + tf.matmul(f_x_trans_V_xx, f_u)
 
-            Q_reg, mu = tf.py_function(self._regularization_scheduler, inp=[self.Q_uu, f_u, f_u], Tout=[tf.float32, tf.float32])
-            self.Q_uu.assign(Q_reg)
+            Q_uu, mu = tf.py_function(self._regularization_scheduler, inp=[Q_uu, f_u, f_u], Tout=[tf.float32, tf.float32])
+            Q_ux, = tf.py_function(self._regularize, inp=[mu, Q_ux, f_u, f_x], Tout=[tf.float32])
+            Q_xu, = tf.py_function(self._regularize, inp=[mu, Q_xu, f_x, f_u], Tout=[tf.float32])
 
-            Q_reg, = tf.py_function(self._regularize, inp=[mu, self.Q_ux, f_u, f_x], Tout=[tf.float32])
-            self.Q_ux.assign(Q_reg)
+            K_t, k_t = tf.py_function(self._get_controller, inp=[action, Q_uu, Q_u, Q_ux], Tout=[tf.float32, tf.float32])
 
-            Q_reg, = tf.py_function(self._regularize, inp=[mu, self.Q_xu, f_x, f_u], Tout=[tf.float32])
-            self.Q_xu.assign(Q_reg)
+            K_t_trans_Q_uu = tf.matmul(tf.transpose(K_t), Q_uu)
 
-            K_t, k_t = tf.py_function(self._get_controller, inp=[action, self.Q_uu, self.Q_u, self.Q_ux], Tout=[tf.float32, tf.float32])
-
-            K_t_trans_Q_uu = tf.matmul(tf.transpose(K_t), self.Q_uu)
-
-            self.V_x.assign(self.Q_x
-                            + tf.matmul(self.Q_xu, k_t)
-                            + tf.matmul(tf.transpose(K_t), self.Q_u)
+            self.V_x.assign(Q_x
+                            + tf.matmul(Q_xu, k_t)
+                            + tf.matmul(tf.transpose(K_t), Q_u)
                             + tf.matmul(K_t_trans_Q_uu, k_t))
-            self.V_xx.assign(self.Q_xx
-                             + tf.matmul(self.Q_xu, K_t)
-                             + tf.matmul(tf.transpose(K_t), self.Q_ux)
+            self.V_xx.assign(Q_xx
+                             + tf.matmul(Q_xu, K_t)
+                             + tf.matmul(tf.transpose(K_t), Q_ux)
                              + tf.matmul(K_t_trans_Q_uu, K_t))
 
             self.J.assign_add(l)
@@ -261,7 +248,6 @@ class iLQR:
                     mu = max(mu_min, mu * delta)
 
             if mu > 0.0:
-                # print(f">> Q is updated with mu={mu}")
                 Q_reg = self._regularize(mu, Q, f1, f2)
 
         return Q_reg, mu
