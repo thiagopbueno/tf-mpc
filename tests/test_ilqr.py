@@ -66,7 +66,7 @@ def test_backward(solver, initial_state, horizon):
 def test_forward(solver, initial_state, horizon):
     x, u = solver.start(initial_state, horizon)
     K, k, J, delta_J = solver.backward(x, u)
-    states, actions, costs, J_hat = solver.forward(x, u, K, k)
+    states, actions, costs, J_hat, residual = solver.forward(x, u, K, k)
 
     assert states.shape == x.shape
     assert actions.shape == u.shape

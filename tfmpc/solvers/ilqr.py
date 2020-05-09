@@ -136,8 +136,14 @@ class iLQR:
         self.J.assign(tf.zeros([]))
 
         state = x[0]
+        residual = tf.constant(0.0)
+
         for t in tf.range(T):
-            action = u[t] + alpha * k[t] + tf.matmul(K[t], state - x[t])
+            delta_x = state - x[t]
+
+            residual = tf.math.maximum(residual, tf.reduce_max(tf.abs(delta_x)))
+
+            action = u[t] + alpha * k[t] + tf.matmul(K[t], delta_x)
             cost = self.env.cost(state, action)
             state = self.env.transition(state, action)
 
@@ -147,7 +153,7 @@ class iLQR:
 
             self.J.assign_add(cost)
 
-        return states.stack(), actions.stack(), costs.stack(), self.J
+        return states.stack(), actions.stack(), costs.stack(), self.J, residual
 
     def solve(self, x0, T):
         x_hat, u_hat = self.start(x0, T)
@@ -165,7 +171,11 @@ class iLQR:
             # improved line search
             accept = False
             while not accept:
-                x, u, c, J_hat = self.forward(x_hat, u_hat, K, k, alpha=alpha)
+                x, u, c, J_hat, residual = self.forward(x_hat, u_hat, K, k, alpha)
+
+                if residual < self.atol:
+                    converged = True
+                    break
 
                 if delta_J < 0:
                     z = (J_hat - J) / delta_J
@@ -176,9 +186,6 @@ class iLQR:
                 else:
                     tf.assert_equal(delta_J, 0.0)
                     accept = True
-
-            if tf.reduce_max(tf.abs(x - x_hat)) < self.atol:
-                converged = True
 
             x_hat, u_hat = x, u
             iterations += 1
