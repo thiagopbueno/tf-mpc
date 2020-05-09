@@ -5,6 +5,7 @@ import tensorflow as tf
 
 TransitionApprox = namedtuple("TransitionApprox", "f f_x f_u")
 CostApprox = namedtuple("CostApprox", "l l_x l_u l_xx l_uu l_ux l_xu")
+FinalCostApprox = namedtuple("CostApprox", "l l_x l_xx")
 
 
 class DiffEnv:
@@ -41,3 +42,17 @@ class DiffEnv:
         del tape
 
         return CostApprox(l, l_x, l_u, l_xx, l_uu, l_ux, l_xu)
+
+    @tf.function
+    def get_quadratic_final_cost(self, state):
+        with tf.GradientTape(persistent=True) as tape:
+            tape.watch(state)
+            l = self.final_cost(state)
+            l_x = tape.gradient(l, state)
+
+        l_xx = tape.jacobian(l_x, state)
+        l_xx = tf.squeeze(l_xx)
+
+        del tape
+
+        return FinalCostApprox(l, l_x, l_xx)

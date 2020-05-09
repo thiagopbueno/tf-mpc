@@ -54,8 +54,11 @@ class iLQR:
         K = tf.TensorArray(dtype=tf.float32, size=T)
         k = tf.TensorArray(dtype=tf.float32, size=T)
 
-        self.V_x.assign(tf.zeros([self.env.state_size, 1]))
-        self.V_xx.assign(tf.zeros([self.env.state_size, self.env.state_size]))
+        final_cost_model = self.env.get_quadratic_final_cost(states[-1])
+        l_x = final_cost_model.l_x
+        l_xx = final_cost_model.l_xx
+        self.V_x.assign(l_x)
+        self.V_xx.assign(l_xx)
 
         self.J.assign(tf.zeros(shape=[]))
         self.delta_J.assign(tf.zeros(shape=[]))

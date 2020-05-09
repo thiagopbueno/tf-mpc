@@ -38,3 +38,7 @@ class Navigation(DiffEnv):
         c1 = tf.reduce_sum((state - self.goal) ** 2)
         c2 = tf.reduce_sum(action ** 2)
         return c1 + self.beta * c2
+
+    @tf.function
+    def final_cost(self, state):
+        return tf.reduce_sum((state - self.goal) ** 2)

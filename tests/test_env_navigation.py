@@ -107,3 +107,27 @@ def test_quadratic_cost(navlin):
         assert isinstance(l_xu, tf.Tensor)
         assert l_xx.shape == (u.shape[0], x.shape[0])
         assert tf.reduce_all(l_xu == tf.zeros((u.shape[0], x.shape[0])))
+
+
+def test_quadratic_final_cost(navlin):
+    goal = navlin.goal
+
+    for _ in range(5):
+        x = tf.random.normal((2, 1))
+
+        model = navlin.get_quadratic_final_cost(x)
+        l = model.l
+        l_x = model.l_x
+        l_xx = model.l_xx
+
+        assert isinstance(l, tf.Tensor)
+        assert l.shape == []
+        assert tf.reduce_all(l == navlin.final_cost(x))
+
+        assert isinstance(l_x, tf.Tensor)
+        assert l_x.shape == x.shape
+        assert tf.reduce_all(l_x == 2 * (x - goal))
+
+        assert isinstance(l_xx, tf.Tensor)
+        assert l_xx.shape == [x.shape[0]] * 2
+        assert tf.reduce_all(l_xx == 2 * tf.eye(2))
