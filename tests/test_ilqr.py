@@ -51,7 +51,7 @@ def test_start(solver, initial_state, horizon):
 
 def test_backward(solver, initial_state, horizon):
     states, actions = solver.start(initial_state, horizon)
-    K, k = solver.backward(states, actions)
+    K, k, J, delta_J = solver.backward(states, actions)
 
     action_size = solver.env.action_size
     state_size = solver.env.state_size
@@ -65,8 +65,8 @@ def test_backward(solver, initial_state, horizon):
 
 def test_forward(solver, initial_state, horizon):
     x, u = solver.start(initial_state, horizon)
-    K, k = solver.backward(x, u)
-    states, actions, costs = solver.forward(x, u, K, k)
+    K, k, J, delta_J = solver.backward(x, u)
+    states, actions, costs, J_hat = solver.forward(x, u, K, k)
 
     assert states.shape == x.shape
     assert actions.shape == u.shape

@@ -56,7 +56,7 @@ class iLQR:
         return states.stack(), actions.stack()
 
     @tf.function
-    def backward(self, states, actions):
+    def backward(self, states, actions, alpha=1.0):
         T = states.shape[0] - 1
 
         K = tf.TensorArray(dtype=tf.float32, size=T)
@@ -64,6 +64,9 @@ class iLQR:
 
         self.V_x.assign(tf.zeros([self.env.state_size, 1]))
         self.V_xx.assign(tf.zeros([self.env.state_size, self.env.state_size]))
+
+        self.J.assign(tf.zeros(shape=[]))
+        self.delta_J.assign(tf.zeros(shape=[]))
 
         for t in tf.range(T - 1, -1, -1):
             state, action = states[t], actions[t]
@@ -73,6 +76,7 @@ class iLQR:
             f_u = transition_model.f_u
 
             cost_model = self.env.get_quadratic_cost(state, action)
+            l = cost_model.l
             l_x = cost_model.l_x
             l_u = cost_model.l_u
             l_xx = cost_model.l_xx
@@ -116,13 +120,21 @@ class iLQR:
                              + tf.matmul(tf.transpose(K_t), self.Q_ux)
                              + tf.matmul(K_t_trans_Q_uu, K_t))
 
+            self.J.assign_add(l)
+
+            d1 = alpha * tf.squeeze(tf.matmul(k_t, Q_u, transpose_a=True))
+            self.delta_J.assign_add(d1)
+
+            d2 = (alpha ** 2) / 2 * tf.squeeze(tf.matmul(tf.matmul(k_t, Q_uu, transpose_a=True), k_t))
+            self.delta_J.assign_add(d2)
+
             K = K.write(t, K_t)
             k = k.write(t, k_t)
 
-        return K.stack(), k.stack()
+        return K.stack(), k.stack(), self.J, self.delta_J
 
     @tf.function
-    def forward(self, x, u, K, k):
+    def forward(self, x, u, K, k, alpha=1.0):
         T = x.shape[0] - 1
 
         states = tf.TensorArray(dtype=tf.float32, size=T + 1)
@@ -131,9 +143,11 @@ class iLQR:
 
         states = states.write(0, x[0])
 
+        self.J.assign(tf.zeros([]))
+
         state = x[0]
         for t in tf.range(T):
-            action = u[t] + k[t] + tf.matmul(K[t], state - x[t])
+            action = u[t] + alpha * k[t] + tf.matmul(K[t], state - x[t])
             cost = self.env.cost(state, action)
             state = self.env.transition(state, action)
 
@@ -141,7 +155,9 @@ class iLQR:
             costs = costs.write(t, cost)
             states = states.write(t + 1, state)
 
-        return states.stack(), actions.stack(), costs.stack()
+            self.J.assign_add(cost)
+
+        return states.stack(), actions.stack(), costs.stack(), self.J
 
     def solve(self, x0, T):
         x_hat, u_hat = self.start(x0, T)
@@ -149,9 +165,27 @@ class iLQR:
         iterations = 0
         converged = False
 
+        alpha = 1.0
+        rho = 0.5
+        c1 = 0.1
+
         while not converged:
-            K, k = self.backward(x_hat, u_hat)
-            x, u, c = self.forward(x_hat, u_hat, K, k)
+            K, k, J, delta_J = self.backward(x_hat, u_hat)
+
+            # improved line search
+            accept = False
+            while not accept:
+                x, u, c, J_hat = self.forward(x_hat, u_hat, K, k, alpha=alpha)
+
+                if delta_J < 0:
+                    z = (J_hat - J) / delta_J
+                    if z >= c1:
+                        accept = True
+                    else:
+                        alpha *= rho
+                else:
+                    tf.assert_equal(delta_J, 0.0)
+                    accept = True
 
             if tf.reduce_max(tf.abs(x - x_hat)) < self.atol:
                 converged = True
