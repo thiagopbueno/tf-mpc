@@ -2,7 +2,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from tfmpc.envs import DiffEnv
+from tfmpc.envs.diffenv import DiffEnv
 
 
 class Navigation(DiffEnv):
