@@ -14,9 +14,13 @@ from tfmpc.utils import trajectory
 
 class iLQR:
 
-    def __init__(self, env, atol=1e-4):
+    def __init__(self, env, atol=1e-4, rho=0.5, c1=0.1, alpha_min=1e-4):
         self.env = env
+
         self.atol = atol
+        self.rho = rho
+        self.c1 = c1
+        self.alpha_min = alpha_min
 
         self.V_x = tf.Variable(tf.zeros([env.state_size, 1]), trainable=False)
         self.V_xx = tf.Variable(tf.zeros([env.state_size, env.state_size]), trainable=False)
@@ -161,15 +165,14 @@ class iLQR:
         iterations = 0
         converged = False
 
-        alpha = 1.0
-        rho = 0.5
-        c1 = 0.1
-
         while not converged:
             K, k, J, delta_J = self.backward(x_hat, u_hat)
 
             # improved line search
             accept = False
+
+            alpha = tf.constant(1.0)
+
             while not accept:
                 x, u, c, J_hat, residual = self.forward(x_hat, u_hat, K, k, alpha)
 
@@ -179,10 +182,11 @@ class iLQR:
 
                 if delta_J < 0:
                     z = (J_hat - J) / delta_J
-                    if z >= c1:
+
+                    if z >= self.c1 or alpha < self.alpha_min:
                         accept = True
                     else:
-                        alpha *= rho
+                        alpha = self.rho * alpha
                 else:
                     tf.assert_equal(delta_J, 0.0)
                     accept = True
@@ -237,7 +241,6 @@ class iLQR:
 
             try:
                 tf.linalg.cholesky(Q_reg)
-                # print(">> Q is positive definite.")
 
                 # positive definite
                 if mu > 0.0: # decrease mu
@@ -245,7 +248,6 @@ class iLQR:
                     mu = mu * delta if mu * delta >= mu_min else 0.0
                     decreased = True
                 else:
-                    # print(">> Q is optimally regularized.")
                     is_optimally_regularized = True
 
             except Exception as e: # not positive definite
