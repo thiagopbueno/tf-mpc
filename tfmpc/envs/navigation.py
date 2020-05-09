@@ -1,4 +1,5 @@
 import gym
+import json
 import numpy as np
 import tensorflow as tf
 
@@ -42,3 +43,27 @@ class Navigation(DiffEnv):
     @tf.function
     def final_cost(self, state):
         return tf.reduce_sum((state - self.goal) ** 2)
+
+    @classmethod
+    def load(cls, path):
+        with open(path, "r") as file:
+            config = json.load(file)
+
+        goal = config["goal"]
+        state_dim = len(goal)
+        goal = tf.constant(goal, shape=(state_dim, 1), dtype=tf.float32)
+        beta = tf.constant(config["beta"], dtype=tf.float32)
+        low = config.get("low")
+        high = config.get("high")
+
+        return cls(goal, beta, low, high)
+
+    def __repr__(self):
+        goal = self.goal.numpy().squeeze().tolist()
+        beta = self.beta
+        bounds = ""
+        if self.action_space.is_bounded():
+            low = self.action_space.low.squeeze().tolist()
+            high = self.action_space.high.squeeze().tolist()
+            bounds = f"bounds=[{low}, {high}]"
+        return f"Navigation(goal={goal}, beta={beta}, {bounds})"
