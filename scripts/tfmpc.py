@@ -3,9 +3,13 @@
 
 import click
 import numpy as np
+import tensorflow as tf
 
-import tfmpc.problems
+from tfmpc import envs
+from tfmpc import problems
+
 import tfmpc.solvers.lqr
+import tfmpc.solvers.ilqr
 
 
 @click.group()
@@ -36,7 +40,7 @@ def lqr(initial_state, action_size, horizon):
     x0 = np.array(initial_state, dtype=np.float32)[:,np.newaxis]
     state_size = len(initial_state)
 
-    problem = tfmpc.problems.make_lqr(state_size, action_size)
+    problem = problems.make_lqr(state_size, action_size)
     trajectory = tfmpc.solvers.lqr.solve(problem, x0, horizon)
 
     print(repr(trajectory))
@@ -72,8 +76,53 @@ def navlin(initial_state, goal, beta, horizon):
     goal = list(map(float, goal.split()))
     g = np.array(goal, dtype=np.float32)[:,np.newaxis]
 
-    problem = tfmpc.problems.make_lqr_linear_navigation(g, beta)
+    problem = problems.make_lqr_linear_navigation(g, beta)
     trajectory = tfmpc.solvers.lqr.solve(problem, x0, horizon)
+
+    print(repr(trajectory))
+    print()
+    print(str(trajectory))
+
+
+@cli.command()
+@click.argument("env")
+@click.argument("initial-state")
+@click.option(
+    "--config", "-c",
+    type=click.Path(exists=True),
+    help="Path to the environment's config JSON file.")
+@click.option(
+    "--horizon", "-hr",
+    type=click.IntRange(min=1),
+    default=10,
+    help="The number of timesteps.",
+    show_default=True)
+@click.option(
+    "--atol",
+    type=click.FloatRange(min=0.0),
+    default=1e-4,
+    help="Absolute tolerance for convergence.",
+    show_default=True)
+def ilqr(env, initial_state, config, horizon, atol):
+    """Run iLQR for the given environment and config.
+
+    Args:
+
+        ENV: environment name.
+
+        INITIAL_STATE: list of floats.
+    """
+    env = envs.make_env(env, config)
+    print(env)
+
+    initial_state = list(map(float, initial_state.split()))
+    state_dim = len(initial_state)
+    x0 = tf.constant(initial_state, dtype=tf.float32, shape=[state_dim, 1])
+
+    T = tf.constant(horizon)
+
+    solver = tfmpc.solvers.ilqr.iLQR(env, atol)
+    trajectory, iterations = solver.solve(x0, T)
 
     print(repr(trajectory))
     print()
