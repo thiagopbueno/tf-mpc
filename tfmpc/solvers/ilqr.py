@@ -142,9 +142,9 @@ class iLQR:
     def forward(self, x, u, K, k, alpha=1.0):
         T = x.shape[0] - 1
 
-        states = tf.TensorArray(dtype=tf.float32, size=T + 1)
+        states = tf.TensorArray(dtype=tf.float32, size=T+1)
         actions = tf.TensorArray(dtype=tf.float32, size=T)
-        costs = tf.TensorArray(dtype=tf.float32, size=T)
+        costs = tf.TensorArray(dtype=tf.float32, size=T+1)
 
         states = states.write(0, x[0])
 
@@ -167,6 +167,10 @@ class iLQR:
             states = states.write(t + 1, state)
 
             self.J.assign_add(cost)
+
+        final_cost = self.env.final_cost(state)
+        costs = costs.write(T, final_cost)
+        self.J.assign_add(final_cost)
 
         return states.stack(), actions.stack(), costs.stack(), self.J, residual
 
