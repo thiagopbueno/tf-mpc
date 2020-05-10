@@ -62,9 +62,9 @@ class LQR:
         for t in reversed(range(T)):
             F_trans_V = tf.matmul(tf.transpose(F), V)
             Q = C + tf.matmul(F_trans_V, F)
-            q = c + \
-                tf.matmul(F_trans_V, f) + \
-                tf.matmul(tf.transpose(F), v)
+            q = (c
+                 + tf.matmul(F_trans_V, f)
+                 + tf.matmul(tf.transpose(F), v))
 
             Q_uu = Q[state_size:, state_size:]
             Q_ux = Q[state_size:, :state_size]
@@ -79,15 +79,15 @@ class LQR:
             q_x = q[:state_size]
             K_Q_uu = tf.matmul(tf.transpose(K), Q_uu)
 
-            V = Q_xx + \
-                tf.matmul(Q_xu, K) + \
-                tf.matmul(tf.transpose(K), Q_ux) + \
-                tf.matmul(K_Q_uu, K)
+            V = (Q_xx
+                 + tf.matmul(Q_xu, K)
+                 + tf.matmul(K_trans, Q_ux)
+                 + tf.matmul(K_Q_uu, K))
 
-            v = q_x + \
-                tf.matmul(Q_xu, k) + \
-                tf.matmul(tf.transpose(K), q_u) + \
-                tf.matmul(K_Q_uu, k)
+            v = (q_x
+                 + tf.matmul(Q_xu, k)
+                 + tf.matmul(K_trans, q_u)
+                 + tf.matmul(K_Q_uu, k))
 
             V_, v_, _ = value_fn[-1]
 
