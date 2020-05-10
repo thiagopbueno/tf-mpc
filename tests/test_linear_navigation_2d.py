@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from tfmpc.problems import make_lqr_linear_navigation
+from tfmpc.envs import make_lqr_linear_navigation
 
 
 @pytest.fixture

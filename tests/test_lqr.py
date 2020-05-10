@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from tfmpc.problems import make_lqr
-from tfmpc.problems.lqr import LQR
+from tfmpc.envs import make_lqr
+from tfmpc.solvers.lqr import LQR
 
 
 @pytest.fixture
@@ -84,6 +84,14 @@ def test_forward(lqr):
         value = const + 1 / 2 * np.dot(np.dot(x_t.T, V), x_t) + np.dot(v.T, x_t)
         cost_to_go = np.sum(c[t:])
         assert np.allclose(value, cost_to_go, atol=1e-2)
+
+
+def test_solve(lqr):
+    x0 = np.random.normal(size=(lqr.state_size, 1)).astype("f")
+    T = 10
+    trajectory = lqr.solve(x0, T)
+    assert len(trajectory.states) == len(trajectory.actions) + 1
+    assert len(trajectory.states) == len(trajectory.costs) + 1
 
 
 def test_dump_and_load(lqr):

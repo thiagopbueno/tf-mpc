@@ -9,7 +9,6 @@ import tensorflow as tf
 import tensorflow.compat.v1.logging as tf_logging
 
 from tfmpc import envs
-from tfmpc import problems
 
 import tfmpc.solvers.lqr
 import tfmpc.solvers.ilqr
@@ -49,8 +48,8 @@ def lqr(initial_state, action_size, horizon):
     x0 = np.array(initial_state, dtype=np.float32)[:,np.newaxis]
     state_size = len(initial_state)
 
-    problem = problems.make_lqr(state_size, action_size)
-    trajectory = tfmpc.solvers.lqr.solve(problem, x0, horizon)
+    solver = envs.make_lqr(state_size, action_size)
+    trajectory = solver.solve(x0, horizon)
 
     print(repr(trajectory))
     print()
@@ -85,8 +84,8 @@ def navlin(initial_state, goal, beta, horizon):
     goal = list(map(float, goal.split()))
     g = np.array(goal, dtype=np.float32)[:,np.newaxis]
 
-    problem = problems.make_lqr_linear_navigation(g, beta)
-    trajectory = tfmpc.solvers.lqr.solve(problem, x0, horizon)
+    solver = envs.make_lqr_linear_navigation(g, beta)
+    trajectory = solver.solve(x0, horizon)
 
     print(repr(trajectory))
     print()
