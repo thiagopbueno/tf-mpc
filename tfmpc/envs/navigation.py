@@ -65,5 +65,5 @@ class Navigation(DiffEnv):
         if self.action_space.is_bounded():
             low = self.action_space.low.squeeze().tolist()
             high = self.action_space.high.squeeze().tolist()
-            bounds = f"bounds=[{low}, {high}]"
-        return f"Navigation(goal={goal}, beta={beta}, {bounds})"
+            bounds = f", bounds=[{low}, {high}]"
+        return f"Navigation(goal={goal}, beta={beta}{bounds})"

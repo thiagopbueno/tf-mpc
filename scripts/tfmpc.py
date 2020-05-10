@@ -2,14 +2,23 @@
 # coding: utf-8
 
 import click
+import gym
 import numpy as np
+import os
 import tensorflow as tf
+import tensorflow.compat.v1.logging as tf_logging
 
 from tfmpc import envs
 from tfmpc import problems
 
 import tfmpc.solvers.lqr
 import tfmpc.solvers.ilqr
+
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+gym.logger.set_level(gym.logger.ERROR)
+tf_logging.set_verbosity(tf_logging.ERROR)
 
 
 @click.group()
@@ -103,7 +112,15 @@ def navlin(initial_state, goal, beta, horizon):
     default=1e-4,
     help="Absolute tolerance for convergence.",
     show_default=True)
-def ilqr(env, initial_state, config, horizon, atol):
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Debug flag.")
+@click.option(
+    "--verbose", "-v",
+    is_flag=True,
+    help="Verbosity flag.")
+def ilqr(env, initial_state, config, horizon, atol, debug, verbose):
     """Run iLQR for the given environment and config.
 
     Args:
@@ -112,8 +129,16 @@ def ilqr(env, initial_state, config, horizon, atol):
 
         INITIAL_STATE: list of floats.
     """
+
+    if verbose:
+        tf_logging.set_verbosity(tf_logging.INFO)
+
+    if debug:
+        tf_logging.set_verbosity(tf_logging.DEBUG)
+
     env = envs.make_env(env, config)
     print(env)
+    print()
 
     initial_state = list(map(float, initial_state.split()))
     state_dim = len(initial_state)
@@ -121,7 +146,7 @@ def ilqr(env, initial_state, config, horizon, atol):
 
     T = tf.constant(horizon)
 
-    solver = tfmpc.solvers.ilqr.iLQR(env, atol)
+    solver = tfmpc.solvers.ilqr.iLQR(env, atol=atol)
     trajectory, iterations = solver.solve(x0, T)
 
     print(repr(trajectory))

@@ -8,6 +8,8 @@ def projected_newton_qp(H, q, low, high, x, eps=1e-6, alpha_0=1.0, rho=0.5, c=1e
         linear = tf.matmul(q, x, transpose_a=True)
         return tf.squeeze(1 / 2 * quadratic + linear)
 
+    trace = []
+
     while True:
         g = q + tf.matmul(H, x)
         free, clamped = _get_qp_indices(g, low, high, x)
@@ -15,13 +17,29 @@ def projected_newton_qp(H, q, low, high, x, eps=1e-6, alpha_0=1.0, rho=0.5, c=1e
         delta_x = tf.Variable(tf.zeros_like(x))
         H_ff, g_f = _get_newton_step(H, q, x, free, clamped, delta_x)
 
-        if tf.norm(g_f) < eps:
+        grad_norm = tf.norm(g_f)
+
+        trace.append({
+            "dim_free": free.numpy().tolist(),
+            "dim_clamped": clamped.numpy().tolist(),
+            "grad_norm": grad_norm.numpy().tolist(),
+            "eps": eps,
+        })
+
+        if grad_norm < eps:
             break
 
         alpha = _armijo_line_search(f, x, g, delta_x, alpha_0, rho, c)
         x = tf.clip_by_value(x + alpha * delta_x, low, high)
 
-    return x, H_ff, free, clamped
+        trace[-1].update({
+            "alpha": alpha,
+            "rho": rho,
+            "c": c,
+            "x": x.numpy().tolist(),
+        })
+
+    return x, H_ff, free, clamped, trace
 
 
 def _armijo_line_search(f, x, g, delta_x, alpha_0=1.0, rho=0.5, c=1e-4):

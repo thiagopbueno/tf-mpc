@@ -6,7 +6,10 @@ through online trajectory optimization' (IROS, 2012)
 for algorithmic details and notation.
 """
 
+import pprint
+import time
 import tensorflow as tf
+import tensorflow.compat.v1.logging as logging
 
 from tfmpc.utils import optimization
 from tfmpc.utils import trajectory
@@ -27,6 +30,14 @@ class iLQR:
 
         self.J = tf.Variable(tf.zeros([]), trainable=False)
         self.delta_J = tf.Variable(tf.zeros([]), trainable=False)
+
+        self.trace = {
+            "backward": {
+                "boxQP": [],
+                "regularization": []
+            },
+            "forward": [],
+        }
 
     @tf.function
     def start(self, x0, T):
@@ -166,7 +177,23 @@ class iLQR:
         converged = False
 
         while not converged:
-            K, k, J, delta_J = self.backward(x_hat, u_hat)
+            self.trace = {
+                "backward": {
+                    "boxQP": [],
+                    "regularization": []
+                },
+                "forward": [],
+            }
+
+            start = time.time()
+            K, k, J_hat, delta_J = self.backward(x_hat, u_hat)
+            uptime = time.time() - start
+
+            self.trace["backward"].update({
+                "time": f"{uptime:.4f}",
+                "J_hat": J_hat.numpy(),
+                "J_delta": delta_J.numpy()
+            })
 
             # improved line search
             accept = False
@@ -174,25 +201,56 @@ class iLQR:
             alpha = tf.constant(1.0)
 
             while not accept:
-                x, u, c, J_hat, residual = self.forward(x_hat, u_hat, K, k, alpha)
+
+                start = time.time()
+                x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha)
+                uptime = time.time() - start
+
+                self.trace["forward"].append({
+                    "time": f"{uptime:.4f}",
+                    "J": J.numpy(),
+                    "alpha": alpha.numpy(),
+                    "alpha_min": self.alpha_min,
+                    "rho": self.rho,
+                    "residual": residual.numpy(),
+                    "atol": self.atol,
+                })
 
                 if residual < self.atol:
                     converged = True
                     break
 
                 if delta_J < 0:
-                    z = (J_hat - J) / delta_J
+                    z = (J - J_hat) / delta_J
 
                     if z >= self.c1 or alpha < self.alpha_min:
                         accept = True
                     else:
                         alpha = self.rho * alpha
+
+                    self.trace["forward"][-1].update({
+                        "z": z.numpy(),
+                        "c1": self.c1
+                    })
                 else:
                     tf.assert_equal(delta_J, 0.0)
                     accept = True
 
+                self.trace["forward"][-1]["accept"] = accept
+
             x_hat, u_hat = x, u
             iterations += 1
+
+            debug_trace = {
+                "boxQP": self.trace["backward"].pop("boxQP"),
+                "regularization": self.trace["backward"].pop("regularization")
+            }
+
+            info_trace_str = pprint.pformat(self.trace, indent=2)
+            logging.info(f">>> Running iteration #{iterations} <<<\n{info_trace_str}")
+
+            debug_trace_str = pprint.pformat(debug_trace)
+            logging.debug(f"BACKWARD::\n{debug_trace_str}")
 
         traj = trajectory.Trajectory(x_hat, u_hat, c)
 
@@ -207,8 +265,10 @@ class iLQR:
             high = self.env.action_space.high - u
 
             k_0 = tf.zeros_like(u)
-            k, Q_uu_f_inv, f, c = optimization.projected_newton_qp(
+            k, Q_uu_f_inv, f, c, trace = optimization.projected_newton_qp(
                 Q_uu, Q_u, low, high, k_0)
+
+            self.trace["backward"]["boxQP"].append(trace)
 
             action_dim = self.env.action_size
             state_dim = self.env.state_size
@@ -236,11 +296,22 @@ class iLQR:
         is_optimally_regularized = False
         decreased = False
 
+        trace = []
+
         while not is_optimally_regularized:
             mu_list.append(mu)
 
+            trace.append({
+                "mu": mu,
+                "mu_min": mu_min,
+                "delta": delta,
+                "delta_0": delta_0,
+            })
+
             try:
                 tf.linalg.cholesky(Q_reg)
+
+                trace[-1]["positive_definite"] = True
 
                 # positive definite
                 if mu > 0.0: # decrease mu
@@ -251,6 +322,8 @@ class iLQR:
                     is_optimally_regularized = True
 
             except Exception as e: # not positive definite
+                trace[-1]["positive_definite"] = False
+
                 if decreased:
                     is_optimally_regularized = True
                     mu = mu_list[-1]
@@ -261,6 +334,8 @@ class iLQR:
 
             if mu > 0.0:
                 Q_reg = self._regularize(mu, Q, f1, f2)
+
+            self.trace["backward"]["regularization"].append(trace)
 
         return Q_reg, mu
 
