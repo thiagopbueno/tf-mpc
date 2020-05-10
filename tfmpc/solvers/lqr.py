@@ -42,8 +42,19 @@ class LQR:
     def cost(self, x, u):
         inputs = tf.concat([x, u], axis=0)
         inputs_transposed = tf.transpose(inputs)
-        return 1 / 2 * tf.matmul(tf.matmul(inputs_transposed, self.C), inputs) + \
-               tf.matmul(inputs_transposed, self.c)
+        c1 = 1 / 2 * tf.matmul(tf.matmul(inputs_transposed, self.C), inputs)
+        c2 = tf.matmul(inputs_transposed, self.c)
+        return c1 + c2
+
+    @tf.function
+    def final_cost(self, x):
+        state_size = self.state_size
+        C_xx = self.C[:state_size, :state_size]
+        c_x = self.c[:state_size]
+        x_transposed = tf.transpose(x)
+        c1 = 1 / 2 * tf.matmul(tf.matmul(x_transposed, C_xx), x)
+        c2 = tf.matmul(x_transposed, c_x)
+        return c1 + c2
 
     @tf.function
     def backward(self, T):
@@ -53,8 +64,8 @@ class LQR:
 
         F, f, C, c = self.F, self.f, self.C, self.c
 
-        V = tf.zeros((state_size, state_size))
-        v = tf.zeros((state_size, 1))
+        V = C[:state_size, :state_size]
+        v = c[:state_size]
         const = 0.0
 
         value_fn.append((V, v, const))
@@ -69,15 +80,19 @@ class LQR:
             Q_uu = Q[state_size:, state_size:]
             Q_ux = Q[state_size:, :state_size]
             q_u = q[state_size:]
+
             inv_Q_uu = tf.linalg.inv(Q_uu)
 
             K = -tf.matmul(inv_Q_uu, Q_ux)
             k = -tf.matmul(inv_Q_uu, q_u)
 
+            K_trans = tf.transpose(K)
+            k_trans = tf.transpose(k)
+
             Q_xx = Q[:state_size, :state_size]
             Q_xu = Q[:state_size, state_size:]
             q_x = q[:state_size]
-            K_Q_uu = tf.matmul(tf.transpose(K), Q_uu)
+            K_Q_uu = tf.matmul(K_trans, Q_uu)
 
             V = (Q_xx
                  + tf.matmul(Q_xu, K)
@@ -91,7 +106,6 @@ class LQR:
 
             V_, v_, _ = value_fn[-1]
 
-            k_trans = tf.transpose(k)
             F_trans = tf.transpose(F)
             f_trans = tf.transpose(f)
             V_f = tf.matmul(V_, f)
@@ -136,6 +150,9 @@ class LQR:
             states.append(next_state)
             actions.append(action)
             costs.append(cost)
+
+        final_cost = self.final_cost(state)
+        costs.append(final_cost)
 
         states = tf.stack(states, axis=0)
         actions = tf.stack(actions, axis=0)

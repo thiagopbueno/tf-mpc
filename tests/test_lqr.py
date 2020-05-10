@@ -55,7 +55,7 @@ def test_forward(lqr):
     policy, value_fn = lqr.backward(T)
 
     x, u, c = lqr.forward(policy, x0, T)
-    assert len(x) == len(u) + 1 == len(c) + 1
+    assert len(x) == len(u) + 1 == len(c)
     assert np.allclose(x[0], x0, atol=1e-2)
 
     F_t = lqr.F.numpy()
@@ -91,7 +91,7 @@ def test_solve(lqr):
     T = 10
     trajectory = lqr.solve(x0, T)
     assert len(trajectory.states) == len(trajectory.actions) + 1
-    assert len(trajectory.states) == len(trajectory.costs) + 1
+    assert len(trajectory.states) == len(trajectory.costs)
 
 
 def test_dump_and_load(lqr):

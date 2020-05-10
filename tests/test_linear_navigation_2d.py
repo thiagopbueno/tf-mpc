@@ -54,7 +54,7 @@ def test_forward(nav):
     policy, _ = nav.backward(T)
 
     x, u, c = nav.forward(policy, x0, T)
-    assert len(x) == len(u) + 1 == len(c) + 1
+    assert len(x) == len(u) + 1 == len(c)
     assert np.allclose(x[0], x0, atol=1e-4)
 
     F_t = nav.F.numpy()
