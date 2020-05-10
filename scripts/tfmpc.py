@@ -37,13 +37,28 @@ def cli():
     type=click.IntRange(min=1),
     default=10,
     help="The number of timesteps.")
-def lqr(initial_state, action_size, horizon):
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Debug flag.")
+@click.option(
+    "--verbose", "-v",
+    is_flag=True,
+    help="Verbosity flag.")
+def lqr(initial_state, action_size, horizon, debug, verbose):
     """Generate and solve a randomly-created LQR problem.
 
     Args:
 
         initial_state: list of floats.
     """
+
+    if verbose:
+        tf_logging.set_verbosity(tf_logging.INFO)
+
+    if debug:
+        tf_logging.set_verbosity(tf_logging.DEBUG)
+
     initial_state = list(map(float, initial_state.split()))
     x0 = np.array(initial_state, dtype=np.float32)[:,np.newaxis]
     state_size = len(initial_state)
@@ -69,7 +84,15 @@ def lqr(initial_state, action_size, horizon):
     type=click.IntRange(min=1),
     default=10,
     help="The number of timesteps.")
-def navlin(initial_state, goal, beta, horizon):
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Debug flag.")
+@click.option(
+    "--verbose", "-v",
+    is_flag=True,
+    help="Verbosity flag.")
+def navlin(initial_state, goal, beta, horizon, debug, verbose):
     """Generate and solve the linear navigation LQR problem.
 
     Args:
@@ -78,6 +101,13 @@ def navlin(initial_state, goal, beta, horizon):
 
         goal: list of floats.
     """
+
+    if verbose:
+        tf_logging.set_verbosity(tf_logging.INFO)
+
+    if debug:
+        tf_logging.set_verbosity(tf_logging.DEBUG)
+
     initial_state = list(map(float, initial_state.split()))
     x0 = np.array(initial_state, dtype=np.float32)[:,np.newaxis]
 
