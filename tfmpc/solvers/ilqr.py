@@ -28,9 +28,6 @@ class iLQR:
         self.V_x = tf.Variable(tf.zeros([env.state_size, 1]), trainable=False)
         self.V_xx = tf.Variable(tf.zeros([env.state_size, env.state_size]), trainable=False)
 
-        self.J = tf.Variable(tf.zeros([]), trainable=False)
-        self.delta_J = tf.Variable(tf.zeros([]), trainable=False)
-
         self.trace = {
             "backward": {
                 "boxQP": [],
@@ -75,8 +72,8 @@ class iLQR:
         self.V_x.assign(l_x)
         self.V_xx.assign(l_xx)
 
-        self.J.assign(tf.zeros(shape=[]))
-        self.delta_J.assign(tf.zeros(shape=[]))
+        J = 0.0
+        delta_J = 0.0
 
         for t in tf.range(T - 1, -1, -1):
             state, action = states[t], actions[t]
@@ -125,18 +122,16 @@ class iLQR:
                              + tf.matmul(tf.transpose(K_t), Q_ux)
                              + tf.matmul(K_t_trans_Q_uu, K_t))
 
-            self.J.assign_add(l)
+            J += l
 
             d1 = alpha * tf.squeeze(tf.matmul(k_t, Q_u, transpose_a=True))
-            self.delta_J.assign_add(d1)
-
             d2 = (alpha ** 2) / 2 * tf.squeeze(tf.matmul(tf.matmul(k_t, Q_uu, transpose_a=True), k_t))
-            self.delta_J.assign_add(d2)
+            delta_J += tf.reshape(d1 + d2, shape=[])
 
             K = K.write(t, K_t)
             k = k.write(t, k_t)
 
-        return K.stack(), k.stack(), self.J, self.delta_J
+        return K.stack(), k.stack(), J, delta_J
 
     @tf.function
     def forward(self, x, u, K, k, alpha=1.0):
@@ -148,7 +143,7 @@ class iLQR:
 
         states = states.write(0, x[0])
 
-        self.J.assign(tf.zeros([]))
+        J = 0.0
 
         state = x[0]
         residual = tf.constant(0.0)
@@ -166,13 +161,13 @@ class iLQR:
             costs = costs.write(t, cost)
             states = states.write(t + 1, state)
 
-            self.J.assign_add(cost)
+            J += cost
 
         final_cost = self.env.final_cost(state)
         costs = costs.write(T, final_cost)
-        self.J.assign_add(final_cost)
+        J += final_cost
 
-        return states.stack(), actions.stack(), costs.stack(), self.J, residual
+        return states.stack(), actions.stack(), costs.stack(), J, residual
 
     def solve(self, x0, T):
         x_hat, u_hat = self.start(x0, T)
