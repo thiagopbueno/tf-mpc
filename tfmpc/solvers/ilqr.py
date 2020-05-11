@@ -64,13 +64,14 @@ class iLQR:
         k = tf.TensorArray(dtype=tf.float32, size=T)
 
         final_cost_model = self.env.get_quadratic_final_cost(states[-1])
+        l = final_cost_model.l
         l_x = final_cost_model.l_x
         l_xx = final_cost_model.l_xx
 
         V_x = l_x
         V_xx = l_xx
 
-        J = 0.0
+        J = l
         delta_J = 0.0
 
         for t in tf.range(T - 1, -1, -1):
@@ -129,8 +130,8 @@ class iLQR:
 
             J += l
 
-            d1 = alpha * tf.squeeze(tf.matmul(k_t_trans, Q_u))
-            d2 = (alpha ** 2) / 2 * tf.squeeze(tf.matmul(tf.matmul(k_t_trans, Q_uu), k_t))
+            d1 = - alpha * tf.squeeze(tf.matmul(k_t_trans, Q_u))
+            d2 = - (alpha ** 2) / 2 * tf.squeeze(tf.matmul(tf.matmul(k_t_trans, Q_uu), k_t))
             delta_J += tf.reshape(d1 + d2, shape=[])
 
             K = K.write(t, K_t)
@@ -224,8 +225,8 @@ class iLQR:
                     converged = True
                     break
 
-                if delta_J < 0:
-                    z = (J - J_hat) / delta_J
+                if delta_J > 0:
+                    z = (J_hat - J) / delta_J
 
                     if z >= self.c1 or alpha < self.alpha_min:
                         accept = True
