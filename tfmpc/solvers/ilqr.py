@@ -25,9 +25,6 @@ class iLQR:
         self.c1 = c1
         self.alpha_min = alpha_min
 
-        self.V_x = tf.Variable(tf.zeros([env.state_size, 1]), trainable=False)
-        self.V_xx = tf.Variable(tf.zeros([env.state_size, env.state_size]), trainable=False)
-
         self.trace = {
             "backward": {
                 "boxQP": [],
@@ -69,8 +66,9 @@ class iLQR:
         final_cost_model = self.env.get_quadratic_final_cost(states[-1])
         l_x = final_cost_model.l_x
         l_xx = final_cost_model.l_xx
-        self.V_x.assign(l_x)
-        self.V_xx.assign(l_xx)
+
+        V_x = l_x
+        V_xx = l_xx
 
         J = 0.0
         delta_J = 0.0
@@ -94,11 +92,11 @@ class iLQR:
             f_x_trans = tf.transpose(f_x)
             f_u_trans = tf.transpose(f_u)
 
-            Q_x = l_x + tf.matmul(f_x_trans, self.V_x)
-            Q_u = l_u + tf.matmul(f_u_trans, self.V_x)
+            Q_x = l_x + tf.matmul(f_x_trans, V_x)
+            Q_u = l_u + tf.matmul(f_u_trans, V_x)
 
-            f_x_trans_V_xx = tf.matmul(f_x_trans, self.V_xx)
-            f_u_trans_V_xx = tf.matmul(f_u_trans, self.V_xx)
+            f_x_trans_V_xx = tf.matmul(f_x_trans, V_xx)
+            f_u_trans_V_xx = tf.matmul(f_u_trans, V_xx)
 
             Q_xx = l_xx + tf.matmul(f_x_trans_V_xx, f_x)
             Q_uu = l_uu + tf.matmul(f_u_trans_V_xx, f_u)
@@ -111,21 +109,28 @@ class iLQR:
 
             K_t, k_t = tf.py_function(self._get_controller, inp=[action, Q_uu, Q_u, Q_ux], Tout=[tf.float32, tf.float32])
 
-            K_t_trans_Q_uu = tf.matmul(tf.transpose(K_t), Q_uu)
+            K_t_trans = tf.transpose(K_t)
+            k_t_trans = tf.transpose(k_t)
+            K_t_trans_Q_uu = tf.matmul(K_t_trans, Q_uu)
 
-            self.V_x.assign(Q_x
-                            + tf.matmul(Q_xu, k_t)
-                            + tf.matmul(tf.transpose(K_t), Q_u)
-                            + tf.matmul(K_t_trans_Q_uu, k_t))
-            self.V_xx.assign(Q_xx
-                             + tf.matmul(Q_xu, K_t)
-                             + tf.matmul(tf.transpose(K_t), Q_ux)
-                             + tf.matmul(K_t_trans_Q_uu, K_t))
+            V_x = tf.reshape(
+                (Q_x
+                 + tf.matmul(Q_xu, k_t)
+                 + tf.matmul(K_t_trans, Q_u)
+                 + tf.matmul(K_t_trans_Q_uu, k_t)),
+                [self.env.state_size, 1])
+
+            V_xx = tf.reshape(
+                (Q_xx
+                 + tf.matmul(Q_xu, K_t)
+                 + tf.matmul(K_t_trans, Q_ux)
+                 + tf.matmul(K_t_trans_Q_uu, K_t)),
+                [self.env.state_size, self.env.state_size])
 
             J += l
 
-            d1 = alpha * tf.squeeze(tf.matmul(k_t, Q_u, transpose_a=True))
-            d2 = (alpha ** 2) / 2 * tf.squeeze(tf.matmul(tf.matmul(k_t, Q_uu, transpose_a=True), k_t))
+            d1 = alpha * tf.squeeze(tf.matmul(k_t_trans, Q_u))
+            d2 = (alpha ** 2) / 2 * tf.squeeze(tf.matmul(tf.matmul(k_t_trans, Q_uu), k_t))
             delta_J += tf.reshape(d1 + d2, shape=[])
 
             K = K.write(t, K_t)
