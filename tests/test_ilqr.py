@@ -38,7 +38,7 @@ def solver(goal, beta, bounds):
     if bounds:
         low, high = bounds
 
-    env = navigation.Navigation(goal, beta, low, high)
+    env = navigation.NavigationLQR(goal, beta, low, high)
     return ilqr.iLQR(env)
 
 

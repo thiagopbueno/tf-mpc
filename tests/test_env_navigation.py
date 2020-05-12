@@ -8,7 +8,7 @@ from tfmpc.envs import navigation
 def navlin():
     goal = tf.constant([[8.0], [-9.0]])
     beta = 5.0
-    return navigation.Navigation(goal, beta)
+    return navigation.NavigationLQR(goal, beta)
 
 
 def test_transition(navlin):

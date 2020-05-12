@@ -1,12 +1,11 @@
 import gym
-import json
 import numpy as np
 import tensorflow as tf
 
 from tfmpc.envs.diffenv import DiffEnv
 
 
-class Navigation(DiffEnv):
+class NavigationLQR(DiffEnv):
 
     def __init__(self, goal, beta, low=None, high=None):
         self.goal = goal
