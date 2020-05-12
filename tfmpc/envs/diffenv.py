@@ -29,13 +29,21 @@ class DiffEnv:
             tape.watch(state)
             tape.watch(action)
             l = self.cost(state, action)
-            l_x, l_u = tape.gradient(l, [state, action])
+            l_x, l_u = tape.gradient(
+                l, [state, action],
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        l_xx, l_xu = tape.jacobian(l_x, [state, action])
+        l_xx, l_xu = tape.jacobian(
+            l_x, [state, action],
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
         l_xx = tf.squeeze(l_xx)
         l_xu = tf.squeeze(l_xu)
 
-        l_ux, l_uu = tape.jacobian(l_u, [state, action])
+        l_ux, l_uu = tape.jacobian(
+            l_u, [state, action],
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
         l_ux = tf.squeeze(l_ux)
         l_uu = tf.squeeze(l_uu)
 
