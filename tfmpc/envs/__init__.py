@@ -1,4 +1,5 @@
 import importlib
+import json
 
 import numpy as np
 from sklearn.datasets import make_spd_matrix
@@ -30,7 +31,11 @@ def make_lqr_linear_navigation(goal, beta):
     return LQR(F, f, C, c)
 
 
-def make_env(env, config=None):
-    module = importlib.import_module(f"tfmpc.envs.{env}")
-    cls_name = env.capitalize()
-    return getattr(module, cls_name).load(config)
+def make_env(config):
+    with open(config, "r") as file:
+        config = json.load(file)
+
+    module = config["module"]
+    module = importlib.import_module(f"tfmpc.envs.{module}")
+    cls_name = config["cls_name"]
+    return getattr(module, cls_name).load(config["config"])

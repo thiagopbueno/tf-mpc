@@ -1,6 +1,10 @@
 {
-    "goal": [[5.5], [-10.0]],
-    "beta": 0.0,
-    "low": -1.0,
-    "high": 1.0
+    "module": "navigation",
+    "cls_name": "NavigationLQR",
+    "config": {
+	"goal": [[5.5], [-10.0]],
+	"beta": 0.0,
+	"low": -1.0,
+	"high": 1.0
+    }
 }

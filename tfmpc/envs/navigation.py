@@ -44,10 +44,7 @@ class NavigationLQR(DiffEnv):
         return tf.reduce_sum((state - self.goal) ** 2)
 
     @classmethod
-    def load(cls, path):
-        with open(path, "r") as file:
-            config = json.load(file)
-
+    def load(cls, config):
         goal = config["goal"]
         state_dim = len(goal)
         goal = tf.constant(goal, shape=(state_dim, 1), dtype=tf.float32)

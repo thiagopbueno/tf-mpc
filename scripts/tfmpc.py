@@ -165,7 +165,7 @@ def ilqr(env, initial_state, config, horizon, atol, debug, verbose):
     if debug:
         tf_logging.set_verbosity(tf_logging.DEBUG)
 
-    env = envs.make_env(env, config)
+    env = envs.make_env(config)
     print(env)
     print()
 
