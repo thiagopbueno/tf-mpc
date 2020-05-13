@@ -1,8 +1,11 @@
 import pytest
 import tensorflow as tf
+import tensorflow.compat.v1.logging as tf_logging
 
-from tfmpc.envs import navigation
+from tfmpc.envs import navigation_lqr
 from tfmpc.solvers import ilqr
+
+tf_logging.set_verbosity(tf_logging.ERROR)
 
 
 @pytest.fixture(params=[[[5.5], [-9.0]]])
@@ -38,7 +41,7 @@ def solver(goal, beta, bounds):
     if bounds:
         low, high = bounds
 
-    env = navigation.NavigationLQR(goal, beta, low, high)
+    env = navigation_lqr.NavigationLQR(goal, beta, low, high)
     return ilqr.iLQR(env)
 
 

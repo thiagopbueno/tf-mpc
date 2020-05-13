@@ -1,5 +1,5 @@
 {
-    "module": "navigation",
+    "module": "navigation_lqr",
     "cls_name": "NavigationLQR",
     "config": {
 	"goal": [[5.5], [-10.0]],

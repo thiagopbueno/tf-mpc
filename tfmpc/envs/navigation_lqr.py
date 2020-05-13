@@ -60,4 +60,4 @@ class NavigationLQR(DiffEnv):
             low = self.action_space.low.squeeze().tolist()
             high = self.action_space.high.squeeze().tolist()
             bounds = f", bounds=[{low}, {high}]"
-        return f"Navigation(goal={goal}, beta={beta}{bounds})"
+        return f"NavigationLQR(goal={goal}, beta={beta}{bounds})"
