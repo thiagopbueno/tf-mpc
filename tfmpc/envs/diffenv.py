@@ -1,5 +1,4 @@
 from collections import namedtuple
-import multiprocessing as mp
 
 import tensorflow as tf
 
@@ -12,20 +11,27 @@ FinalCostApprox = namedtuple("CostApprox", "l l_x l_xx")
 class DiffEnv:
 
     @tf.function
-    def get_linear_transition(self, state, action):
-        with tf.GradientTape() as tape:
+    def get_linear_transition(self, state, action, batch=False):
+        with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             tape.watch(action)
             f = self.transition(state, action)
 
-        f_x, f_u = tape.jacobian(f, [state, action])
+        if batch:
+            f_x = tape.batch_jacobian(f, state)
+            f_u = tape.batch_jacobian(f, action)
+        else:
+            f_x, f_u = tape.jacobian(f, [state, action])
+
+        del tape
+
         f_x = tf.squeeze(f_x)
         f_u = tf.squeeze(f_u)
 
         return TransitionApprox(f, f_x, f_u)
 
     @tf.function
-    def get_quadratic_cost(self, state, action):
+    def get_quadratic_cost(self, state, action, batch=False):
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             tape.watch(action)
@@ -34,16 +40,32 @@ class DiffEnv:
                 l, [state, action],
                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        l_xx, l_xu = tape.jacobian(
-            l_x, [state, action],
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        if batch:
+            l_xx = tape.batch_jacobian(
+                l_x, state,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            l_xu = tape.batch_jacobian(
+                l_x, action,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        else:
+            l_xx, l_xu = tape.jacobian(
+                l_x, [state, action],
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         l_xx = tf.squeeze(l_xx)
         l_xu = tf.squeeze(l_xu)
 
-        l_ux, l_uu = tape.jacobian(
-            l_u, [state, action],
-            unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        if batch:
+            l_ux = tape.batch_jacobian(
+                l_u, state,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            l_uu = tape.batch_jacobian(
+                l_u, action,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
+        else:
+            l_ux, l_uu = tape.jacobian(
+                l_u, [state, action],
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
         l_ux = tf.squeeze(l_ux)
         l_uu = tf.squeeze(l_uu)
@@ -65,17 +87,3 @@ class DiffEnv:
         del tape
 
         return FinalCostApprox(l, l_x, l_xx)
-
-    def _get_lq_model(self, inp):
-        state, action = inp
-        transition_model = self.get_linear_transition(state, action)
-        cost_model = self.get_quadratic_cost(state, action)
-        return transition_model, cost_model
-
-    #@tf.function
-    def get_linear_quadratic_model(self, states, actions, processes=2):
-        states = tf.unstack(states[:-1])
-        actions = tf.unstack(actions)
-        with mp.get_context("spawn").Pool(processes) as pool:
-            models = pool.map(self._get_lq_model, zip(states, actions))
-            return models

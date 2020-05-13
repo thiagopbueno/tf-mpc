@@ -33,13 +33,18 @@ class NavigationLQR(DiffEnv):
 
     @tf.function
     def cost(self, state, action):
-        c1 = tf.reduce_sum((state - self.goal) ** 2)
-        c2 = tf.reduce_sum(action ** 2)
+        state = tf.squeeze(state)
+        goal = tf.squeeze(self.goal)
+        action = tf.squeeze(action)
+        c1 = tf.reduce_sum((state - goal) ** 2, axis=-1)
+        c2 = tf.reduce_sum(action ** 2, axis=-1)
         return c1 + self.beta * c2
 
     @tf.function
     def final_cost(self, state):
-        return tf.reduce_sum((state - self.goal) ** 2)
+        state = tf.squeeze(state)
+        goal = tf.squeeze(self.goal)
+        return tf.reduce_sum((state - goal) ** 2, axis=-1)
 
     @classmethod
     def load(cls, config):

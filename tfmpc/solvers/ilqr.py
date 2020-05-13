@@ -52,55 +52,38 @@ class iLQR:
 
     def derivatives(self, states, actions):
         start = time.time()
-        models = self.env.get_linear_quadratic_model(states, actions)
+        transition_model = self.env.get_linear_transition(states[:-1], actions, batch=True)
+        cost_model = self.env.get_quadratic_cost(states[:-1], actions, batch=True)
+        final_cost_model = self.env.get_quadratic_final_cost(states[-1])
         uptime = time.time() - start
-        tf_logging.info(f"[DERIVATIVES] uptime = {uptime:.6f} (PARALLEL)")
+        tf_logging.info(f"[DERIVATIVES] uptime = {uptime:.6f}")
 
-        start = time.time()
-        models = []
-        for s, a in zip(tf.unstack(states[:-1]), tf.unstack(actions)):
-            transition_model = self.env.get_linear_transition(s, a)
-            cost_model = self.env.get_quadratic_cost(s, a)
-            models.append((transition_model, cost_model))
-        uptime = time.time() - start
-        tf_logging.info(f"[DERIVATIVES] uptime = {uptime:.6f} (SERIAL)")
-
-        return models
+        return transition_model, cost_model, final_cost_model
 
     @tf.function
-    def backward(self, states, actions, mu=1.0):
-        T = states.shape[0] - 1
+    def backward(self, T, actions, transition_model, cost_model, final_cost_model, mu=1.0):
         state_size = self.env.state_size
 
         K = tf.TensorArray(dtype=tf.float32, size=T)
         k = tf.TensorArray(dtype=tf.float32, size=T)
 
-        final_cost_model = self.env.get_quadratic_final_cost(states[-1])
-        l = final_cost_model.l
-        l_x = final_cost_model.l_x
-        l_xx = final_cost_model.l_xx
+        V_x = final_cost_model.l_x
+        V_xx = final_cost_model.l_xx
 
-        V_x = l_x
-        V_xx = l_xx
-
-        J = l
+        J = final_cost_model.l
         dV1 = 0.0
         dV2 = 0.0
 
         for t in tf.range(T - 1, -1, -1):
-            state, action = states[t], actions[t]
+            f_x = transition_model.f_x[t]
+            f_u = transition_model.f_u[t]
 
-            transition_model = self.env.get_linear_transition(state, action)
-            f_x = transition_model.f_x
-            f_u = transition_model.f_u
-
-            cost_model = self.env.get_quadratic_cost(state, action)
-            l = cost_model.l
-            l_x = cost_model.l_x
-            l_u = cost_model.l_u
-            l_xx = cost_model.l_xx
-            l_uu = cost_model.l_uu
-            l_xu = cost_model.l_xu
+            l = cost_model.l[t]
+            l_x = cost_model.l_x[t]
+            l_u = cost_model.l_u[t]
+            l_xx = cost_model.l_xx[t]
+            l_uu = cost_model.l_uu[t]
+            l_xu = cost_model.l_xu[t]
 
             f_x_trans = tf.transpose(f_x)
             f_u_trans = tf.transpose(f_u)
@@ -120,7 +103,7 @@ class iLQR:
             Q_ux_reg = tf.transpose(l_xu) + tf.matmul(f_u_trans_V_xx_reg, f_x)
 
             if self.env.action_space.is_bounded():
-                K_t, k_t = tf.py_function(self._get_constrained_controller, inp=[action, Q_uu_reg, Q_ux_reg, Q_u], Tout=[tf.float32, tf.float32])
+                K_t, k_t = tf.py_function(self._get_constrained_controller, inp=[actions[t], Q_uu_reg, Q_ux_reg, Q_u], Tout=[tf.float32, tf.float32])
             else:
                 K_t, k_t = self._get_unconstrained_controller(Q_uu_reg, Q_ux_reg, Q_u)
 
@@ -231,8 +214,10 @@ class iLQR:
         converged = False
 
         for iteration in range(self.max_iterations):
-
             tf_logging.info(f"[SOLVE] Iteration = {iteration}")
+
+            # derivatives
+            transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
 
             # backward pass
             mu = 0.0
@@ -240,18 +225,15 @@ class iLQR:
             optimally_regularized = False
 
             while not optimally_regularized:
-                # TEST
-                self.derivatives(x_hat, u_hat)
-
                 tf_logging.debug(f"[BACKWARD] mu = {mu}, delta = {delta}")
 
                 try:
                     start = time.time()
-                    K, k, J_hat, dV1, dV2 = self.backward(x_hat, u_hat, mu)
+                    K, k, J_hat, dV1, dV2 = self.backward(T, u_hat, transition_model, cost_model, final_cost_model, mu)
                     uptime = time.time() - start
 
                     tf_logging.info(f"[BACKWARD] uptime = {uptime:.4f} sec")
-                    tf_logging.info(f"[BACKWARD] J_hat = {J_hat}")
+                    tf_logging.info(f"[BACKWARD] J_hat = {J_hat:.4f}")
 
                     if mu == 0.0:
                         optimally_regularized = True
@@ -272,7 +254,7 @@ class iLQR:
                     mu = max(mu_min, mu * delta)
 
                 except Exception as e:
-                    tf_logging.fatal(e)
+                    tf_logging.fatal(f"[BACKWARD] Error: {e}")
                     exit(-1)
 
             # forward pass
@@ -297,13 +279,13 @@ class iLQR:
                 delta_J = - alpha * (dV1 + alpha * dV2)
                 dcost = J_hat - J
 
-                tf_logging.debug(f"[FORWARD] dcost = {dcost}, delta_J = {delta_J}")
+                tf_logging.debug(f"[FORWARD] dcost = {dcost}, delta_J = {delta_J:.4f}")
 
                 if delta_J > 0:
                     z = dcost / delta_J
                 else:
                     z = tf.sign(dcost)
-                    tf_logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J}")
+                    tf_logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J:.4f}")
 
                 if z >= self.c1:
                     accept = True
