@@ -50,6 +50,23 @@ class iLQR:
 
         return states.stack(), actions.stack()
 
+    def derivatives(self, states, actions):
+        start = time.time()
+        models = self.env.get_linear_quadratic_model(states, actions)
+        uptime = time.time() - start
+        tf_logging.info(f"[DERIVATIVES] uptime = {uptime:.6f} (PARALLEL)")
+
+        start = time.time()
+        models = []
+        for s, a in zip(tf.unstack(states[:-1]), tf.unstack(actions)):
+            transition_model = self.env.get_linear_transition(s, a)
+            cost_model = self.env.get_quadratic_cost(s, a)
+            models.append((transition_model, cost_model))
+        uptime = time.time() - start
+        tf_logging.info(f"[DERIVATIVES] uptime = {uptime:.6f} (SERIAL)")
+
+        return models
+
     @tf.function
     def backward(self, states, actions, mu=1.0):
         T = states.shape[0] - 1
@@ -223,6 +240,9 @@ class iLQR:
             optimally_regularized = False
 
             while not optimally_regularized:
+                # TEST
+                self.derivatives(x_hat, u_hat)
+
                 tf_logging.debug(f"[BACKWARD] mu = {mu}, delta = {delta}")
 
                 try:

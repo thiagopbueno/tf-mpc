@@ -59,6 +59,13 @@ def test_start(solver, initial_state, horizon):
         assert tf.reduce_all(states[t + 1] == solver.env.transition(x, u))
 
 
+def test_derivatives(solver, initial_state, horizon):
+    states, actions = solver.start(initial_state, horizon)
+    models = solver.derivatives(states, actions)
+
+    assert len(models) == horizon
+    assert all(len(model) == 2 for model in models)
+
 def test_backward(solver, initial_state, horizon):
     states, actions = solver.start(initial_state, horizon)
     K, k, J, dV1, dV2 = solver.backward(states, actions)

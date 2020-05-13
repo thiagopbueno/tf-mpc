@@ -1,4 +1,5 @@
 from collections import namedtuple
+import multiprocessing as mp
 
 import tensorflow as tf
 
@@ -64,3 +65,17 @@ class DiffEnv:
         del tape
 
         return FinalCostApprox(l, l_x, l_xx)
+
+    def _get_lq_model(self, inp):
+        state, action = inp
+        transition_model = self.get_linear_transition(state, action)
+        cost_model = self.get_quadratic_cost(state, action)
+        return transition_model, cost_model
+
+    #@tf.function
+    def get_linear_quadratic_model(self, states, actions, processes=2):
+        states = tf.unstack(states[:-1])
+        actions = tf.unstack(actions)
+        with mp.get_context("spawn").Pool(processes) as pool:
+            models = pool.map(self._get_lq_model, zip(states, actions))
+            return models
