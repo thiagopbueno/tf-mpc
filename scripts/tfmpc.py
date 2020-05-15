@@ -123,7 +123,6 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
 
 
 @cli.command()
-@click.argument("env")
 @click.argument("initial-state")
 @click.option(
     "--config", "-c",
@@ -149,12 +148,10 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     "--verbose", "-v",
     is_flag=True,
     help="Verbosity flag.")
-def ilqr(env, initial_state, config, horizon, atol, debug, verbose):
+def ilqr(initial_state, config, horizon, atol, debug, verbose):
     """Run iLQR for the given environment and config.
 
     Args:
-
-        ENV: environment name.
 
         INITIAL_STATE: list of floats.
     """
