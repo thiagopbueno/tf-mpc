@@ -29,23 +29,37 @@ class Navigation(DiffEnv):
         return self.goal.shape[0]
 
     @tf.function
-    def transition(self, state, action):
-        lambda_ = self._deceleration(state)
-        return state + lambda_ * action
+    def transition(self, state, action, batch=False):
+        lambda_ = self._deceleration(state, batch)
+        if batch:
+            lambda_ = tf.reshape(lambda_, [tf.shape(lambda_)[0], 1, 1])
+        next_state = state + lambda_ * action
+        return next_state
 
     @tf.function
-    def cost(self, state, action):
-        return tf.reduce_sum((state - self.goal) ** 2)
+    def cost(self, state, action, batch=False):
+        state = tf.squeeze(state)
+        goal = tf.squeeze(self.goal)
+        return tf.reduce_sum((state - goal) ** 2, axis=-1)
 
     @tf.function
-    def final_cost(self, state):
-        return tf.reduce_sum((state - self.goal) ** 2)
+    def final_cost(self, state, batch=False):
+        state = tf.squeeze(state)
+        goal = tf.squeeze(self.goal)
+        return tf.reduce_sum((state - goal) ** 2, axis=-1)
 
     @tf.function
-    def _deceleration(self, state):
+    def _deceleration(self, state, batch=False):
         center = self.deceleration["center"]
         decay = self.deceleration["decay"]
-        distance = tf.norm(state - center)
+
+        if batch:
+            state = tf.expand_dims(state, axis=1)
+
+        delta = state - center
+        delta = tf.squeeze(delta, axis=-1)
+        distance = tf.norm(delta, axis=-1)
+
         lambdas = 2 / (1.0 + tf.exp(-decay * distance)) - 1.0
         return tf.reduce_prod(lambdas,  axis=-1)
 

@@ -19,15 +19,18 @@ def env(request):
 
 
 def test_deceleration(env):
-    center = env.deceleration["center"][0]
-    decay = env.deceleration["decay"][0]
+    center = env.deceleration["center"]
+    decay = env.deceleration["decay"]
 
     for _ in range(10):
-        state = tf.random.normal(shape=[], mean=center, stddev=2.0)
-        lambda_ = env._deceleration(state)
+        state = tf.random.normal(shape=[], mean=center[0], stddev=2.0)
+        lambda_ = env._deceleration(state, batch=False)
 
-        distance = np.sqrt(np.sum((state - center) ** 2))
-        expected = 2 / (1.0 + np.exp(-decay * distance)) - 1.0
+        expected = 1.0
+        for c, d in zip(center, decay):
+            delta = np.squeeze(state - c)
+            distance = np.sqrt(np.sum(delta ** 2, axis=-1))
+            expected *= 2 / (1.0 + np.exp(-d * distance)) - 1.0
 
         assert isinstance(lambda_, tf.Tensor)
         assert lambda_.shape == []
@@ -35,17 +38,56 @@ def test_deceleration(env):
         assert tf.abs(lambda_ - expected) < 1e-4
 
 
+def test_deceleration_batch(env):
+    center = env.deceleration["center"]
+    decay = env.deceleration["decay"]
+
+    batch_size = 5
+    for _ in range(10):
+        state = tf.random.normal(shape=[batch_size,],
+                                 mean=center[0], stddev=2.0)
+        state = tf.reshape(state, (batch_size, -1, 1))
+        lambda_ = env._deceleration(state, batch=True)
+
+        expected = 1.0
+        for c, d in zip(center, decay):
+            delta = np.squeeze(state - c)
+            distance = np.sqrt(np.sum(delta ** 2, axis=-1))
+            expected *= 2 / (1.0 + np.exp(-d * distance)) - 1.0
+
+        assert isinstance(lambda_, tf.Tensor)
+        assert lambda_.shape == [batch_size,]
+        assert lambda_.dtype == tf.float32
+        assert tf.reduce_all(tf.abs(lambda_ - expected) < 1e-4)
+
+
 def test_transition(env):
-    for _ in range(5):
+    for _ in range(10):
         x0 = tf.random.normal((2, 1))
         u0 = tf.random.uniform((2, 1))
 
-        lambda_ = env._deceleration(x0)
-        x1 = env.transition(x0, u0)
+        lambda_ = env._deceleration(x0, batch=False)
+        x1 = env.transition(x0, u0, batch=False)
 
         assert isinstance(x1, tf.Tensor)
         assert x1.shape == x0.shape
         assert all(x1 == x0 + lambda_ * u0)
+
+
+def test_transition_batch(env):
+    batch_size = 5
+
+    for _ in range(10):
+        x0 = tf.random.normal((batch_size, 2, 1))
+        u0 = tf.random.uniform((batch_size, 2, 1))
+
+        lambda_ = env._deceleration(x0, batch=True)
+        x1 = env.transition(x0, u0, batch=True)
+
+        assert isinstance(x1, tf.Tensor)
+        assert x1.shape == x0.shape
+        lambda_ = np.reshape(lambda_, (lambda_.shape[0], 1, 1))
+        assert np.allclose(x1, x0 + lambda_ * u0)
 
 
 def test_linear_transition(env):
@@ -94,6 +136,20 @@ def test_cost(env):
         assert isinstance(c, tf.Tensor)
         assert c.shape == []
         assert tf.reduce_all(c == tf.reduce_sum((x - goal) ** 2))
+
+
+def test_cost_batch(env):
+    batch_size = 5
+
+    goal = env.goal
+    for _ in range(5):
+        x = tf.random.normal((batch_size, 2, 1))
+        u = tf.random.uniform((batch_size, 2, 1))
+
+        c = env.cost(x, u)
+
+        assert isinstance(c, tf.Tensor)
+        assert c.shape == [batch_size,]
 
 
 def test_quadratic_cost(env):
