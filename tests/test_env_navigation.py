@@ -5,12 +5,13 @@ import tensorflow as tf
 from tfmpc.envs import navigation
 
 
-@pytest.fixture
-def env():
+@pytest.fixture(params=[1, 2], ids=["1-zone", "2-zones"])
+def env(request):
+    n_zones = request.param
     goal = tf.constant([[8.0], [9.0]])
     deceleration = {
-        "center": tf.constant([[[4.0], [3.0]]]),
-        "decay": tf.constant([2.0])
+        "center": tf.random.normal(shape=[n_zones, 2, 1]),
+        "decay": tf.random.uniform(shape=[n_zones,], maxval=3.0)
     }
     low = [-1.0, -1.0]
     high = [1.0, 1.0]
