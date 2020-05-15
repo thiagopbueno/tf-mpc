@@ -28,11 +28,11 @@ class NavigationLQR(DiffEnv):
         return self.goal.shape[0]
 
     @tf.function
-    def transition(self, state, action):
+    def transition(self, state, action, batch=False):
         return state + action
 
     @tf.function
-    def cost(self, state, action):
+    def cost(self, state, action, batch=False):
         state = tf.squeeze(state)
         goal = tf.squeeze(self.goal)
         action = tf.squeeze(action)
