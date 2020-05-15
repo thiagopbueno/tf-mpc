@@ -15,7 +15,7 @@ class DiffEnv:
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             tape.watch(action)
-            f = self.transition(state, action)
+            f = self.transition(state, action, batch)
 
         if batch:
             f_x = tape.batch_jacobian(f, state)
@@ -35,7 +35,7 @@ class DiffEnv:
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             tape.watch(action)
-            l = self.cost(state, action)
+            l = self.cost(state, action, batch)
             l_x, l_u = tape.gradient(
                 l, [state, action],
                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
