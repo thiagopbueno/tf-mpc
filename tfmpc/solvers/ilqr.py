@@ -192,6 +192,9 @@ class iLQR:
         return states.stack(), actions.stack(), costs.stack(), J, residual
 
     def solve(self, x0, T):
+        mu = 0.0
+        delta = 1.0
+
         x_hat, u_hat = self.start(x0, T)
 
         for iteration in range(self.max_iterations):
@@ -200,30 +203,55 @@ class iLQR:
             # model approximation
             transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
 
-            # backward pass
-            K, k, J_hat, dV1, dV2 = self._backward(T, u_hat, transition_model, cost_model, final_cost_model)
+            accept = False
+            converged = False
 
-            # forward pass
-            x_hat, u_hat, c_hat, residual = self._forward(x_hat, u_hat, J_hat, K, k, dV1, dV2)
+            while not accept:
+                # backward pass
+                K, k, J_hat, dV1, dV2 = self._backward(T, u_hat, transition_model, cost_model, final_cost_model, mu, delta)
+
+                # check for termination due to small gradient
+                g_norm = tf.reduce_mean(tf.reduce_max(tf.abs(k) / (tf.abs(u_hat) + 1.0),axis=1), axis=0)[0]
+                tf_logging.debug(f"[SOLVE] g_norm = {g_norm:.6f}")
+                if g_norm < self.atol:
+                    tf_logging.debug(f"[SOLVE] CONVERGED: g_norm < atol ({g_norm:.4f} < {self.atol})")
+                    converged = True
+                    break
+
+                # forward pass (backtracking line-search)
+                done, x, u, c, residual = self._forward(x_hat, u_hat, J_hat, K, k, dV1, dV2)
+
+                if residual < self.atol:
+                    tf_logging.debug(f"[SOLVE] CONVERGED: residual < atol ({residual:.6f} < {self.atol:.6f})")
+                    converged = True
+                    break
+
+                if done:
+                    # decrease regularization
+                    delta = min(1 / self.delta_0, delta / self.delta_0)
+                    mu = mu * delta * (mu * delta > self.mu_min)
+
+                    # accept improvement
+                    x_hat, u_hat, c_hat = x, u, c
+                    accept = True
+                else:
+                    # increase regularization
+                    delta = max(self.delta_0, delta * self.delta_0)
+                    mu = max(self.mu_min, mu * delta)
 
             # convergence test
-            if residual < self.atol:
+            if converged:
                 break
 
         traj = trajectory.Trajectory(x_hat, u_hat, c_hat)
 
         return traj, iteration
 
-    def _backward(self, T, u_hat, transition_model, cost_model, final_cost_model):
-        mu = 0.0
-        mu_min = 1e-6
-        mu_old = None
-        delta = 1.0
-        delta_0 = 2.0
+    def _backward(self, T, u_hat, transition_model, cost_model, final_cost_model, mu, delta):
 
-        optimally_regularized = False
+        done = False
 
-        while not optimally_regularized:
+        while not done:
             tf_logging.debug(f"[BACKWARD] mu = {mu}, delta = {delta}")
 
             try:
@@ -231,26 +259,16 @@ class iLQR:
                 K, k, J_hat, dV1, dV2 = self.backward(T, u_hat, transition_model, cost_model, final_cost_model, mu)
                 uptime = time.time() - start
 
+                done = True
+
                 tf_logging.info(f"[BACKWARD] uptime = {uptime:.4f} sec")
                 tf_logging.info(f"[BACKWARD] J_hat = {J_hat:.4f}")
-
-                if mu == 0.0:
-                    optimally_regularized = True
-                elif not optimally_regularized:
-                    mu_old = mu
-                    delta = min(1 / delta_0, delta / delta_0)
-                    mu = mu * delta * (mu * delta > mu_min)
 
             except tf.errors.InvalidArgumentError as e:
                 tf_logging.warn(f"[BACKWARD] could not run iLQR.backward : {e}")
 
-                if mu_old:
-                    mu = mu_old
-                    optimally_regularized = True
-                    continue
-
-                delta = max(delta_0, delta * delta_0)
-                mu = max(mu_min, mu * delta)
+                delta = max(self.delta_0, delta * self.delta_0)
+                mu = max(self.mu_min, mu * delta)
 
             except Exception as e:
                 tf_logging.fatal(f"[BACKWARD] Error: {e}")
@@ -259,6 +277,7 @@ class iLQR:
         return K, k, J_hat, dV1, dV2
 
     def _forward(self, x_hat, u_hat, J_hat, K, k, dV1, dV2):
+        accept = False
 
         for alpha in np.geomspace(1.0, self.alpha_min, 11):
             tf_logging.debug(f"[FORWARD] alpha = {alpha}")
@@ -271,8 +290,9 @@ class iLQR:
             tf_logging.info(f"[FORWARD] J = {J:.4f}")
             tf_logging.debug(f"[FORWARD] residual = {residual}")
 
-            if residual < self.atol:
-                break
+            # if residual < self.atol:
+            #     accept = True
+            #     break
 
             delta_J = - alpha * (dV1 + alpha * dV2)
             dcost = J_hat - J
@@ -290,7 +310,7 @@ class iLQR:
                 accept = True
                 break
 
-        return x, u, c, residual
+        return accept, x, u, c, residual
 
     def _get_unconstrained_controller(self, Q_uu, Q_ux, Q_u):
         R = tf.linalg.cholesky(Q_uu)
