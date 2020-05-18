@@ -42,7 +42,7 @@ class iLQR:
 
         for t in tf.range(T):
             state = states.read(t)
-            action = tf.random.uniform(x0.shape, minval=minval, maxval=maxval)
+            action = tf.random.uniform([], minval=minval, maxval=maxval)
             state = self.env.transition(state, action)
 
             actions = actions.write(t, action)
