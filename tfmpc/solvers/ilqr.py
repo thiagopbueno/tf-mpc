@@ -6,6 +6,7 @@ through online trajectory optimization' (IROS, 2012)
 for algorithmic details and notation.
 """
 
+import numpy as np
 import pprint
 import time
 import tensorflow as tf
@@ -17,11 +18,11 @@ from tfmpc.utils import trajectory
 
 class iLQR:
 
-    def __init__(self, env, atol=1e-4, rho=0.5, c1=0.1, alpha_min=1e-4, max_iterations=100):
+    def __init__(self, env, atol=1e-4, c1=0.0, alpha_min=1e-3, max_iterations=100):
         self.env = env
 
         self.atol = atol
-        self.rho = rho
+
         self.c1 = c1
         self.alpha_min = alpha_min
 
@@ -136,36 +137,6 @@ class iLQR:
 
         return K.stack(), k.stack(), J, dV1, dV2
 
-    def _get_unconstrained_controller(self, Q_uu, Q_ux, Q_u):
-        R = tf.linalg.cholesky(Q_uu)
-        kK = -tf.linalg.cholesky_solve(R, tf.concat([Q_u, Q_ux], axis=1))
-        k = kK[:,:1]
-        K = kK[:,1:]
-        return K, k
-
-    def _get_constrained_controller(self, u, Q_uu, Q_ux, Q_u):
-        low = self.env.action_space.low - u
-        high = self.env.action_space.high - u
-
-        k_0 = tf.zeros_like(u)
-        k, Hfree, free, clamped = optimization.projected_newton_qp(Q_uu, Q_u, low, high, k_0)
-
-        action_dim = self.env.action_size
-        state_dim = self.env.state_size
-        K = tf.Variable(tf.zeros([action_dim, state_dim]))
-
-        n_free = tf.math.count_nonzero(tf.squeeze(free))
-        if n_free > 0:
-            free = tf.squeeze(free)
-            Q_ux_f = Q_ux[free]
-            indices = tf.where(free)
-            values = - tf.linalg.cholesky_solve(Hfree, Q_ux_f)
-            K.scatter_nd_update(indices, values)
-
-        K = tf.constant(K.numpy())
-
-        return K, k
-
     @tf.function
     def forward(self, x, u, K, k, alpha=1.0):
         T = x.shape[0] - 1
@@ -205,98 +176,130 @@ class iLQR:
     def solve(self, x0, T):
         x_hat, u_hat = self.start(x0, T)
 
-        mu = 0.0
-        mu_min = 1e-6
-        mu_old = None
-        delta = 1
-        delta_0 = 2
-
-        converged = False
-
         for iteration in range(self.max_iterations):
             tf_logging.info(f"[SOLVE] Iteration = {iteration}")
 
-            # derivatives
+            # model approximation
             transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
 
             # backward pass
-            mu = 0.0
-            delta = 1
-            optimally_regularized = False
-
-            while not optimally_regularized:
-                tf_logging.debug(f"[BACKWARD] mu = {mu}, delta = {delta}")
-
-                try:
-                    start = time.time()
-                    K, k, J_hat, dV1, dV2 = self.backward(T, u_hat, transition_model, cost_model, final_cost_model, mu)
-                    uptime = time.time() - start
-
-                    tf_logging.info(f"[BACKWARD] uptime = {uptime:.4f} sec")
-                    tf_logging.info(f"[BACKWARD] J_hat = {J_hat:.4f}")
-
-                    if mu == 0.0:
-                        optimally_regularized = True
-                    elif not optimally_regularized:
-                        mu_old = mu
-                        delta = min(1 / delta_0, delta / delta_0)
-                        mu = mu * delta * (mu * delta > mu_min)
-
-                except tf.errors.InvalidArgumentError as e:
-                    tf_logging.warn(f"[BACKWARD] could not run iLQR.backward : {e}")
-
-                    if mu_old:
-                        mu = mu_old
-                        optimally_regularized = True
-                        continue
-
-                    delta = max(delta_0, delta * delta_0)
-                    mu = max(mu_min, mu * delta)
-
-                except Exception as e:
-                    tf_logging.fatal(f"[BACKWARD] Error: {e}")
-                    exit(-1)
+            K, k, J_hat, dV1, dV2 = self._backward(T, u_hat, transition_model, cost_model, final_cost_model)
 
             # forward pass
-            alpha = 1.0
-            accept = False
+            x_hat, u_hat, c_hat, residual = self._forward(x_hat, u_hat, J_hat, K, k, dV1, dV2)
 
-            while not accept:
-                tf_logging.debug(f"[FORWARD] alpha = {alpha}")
-
-                start = time.time()
-                x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha)
-                uptime = time.time() - start
-
-                tf_logging.info(f"[FORWARD] uptime = {uptime:.4f} sec")
-                tf_logging.info(f"[FORWARD] J = {J:.4f}")
-                tf_logging.debug(f"[FORWARD] residual = {residual}")
-
-                if residual < self.atol:
-                    converged = True
-                    break
-
-                delta_J = - alpha * (dV1 + alpha * dV2)
-                dcost = J_hat - J
-
-                tf_logging.debug(f"[FORWARD] dcost = {dcost}, delta_J = {delta_J:.4f}")
-
-                if delta_J > 0:
-                    z = dcost / delta_J
-                else:
-                    z = tf.sign(dcost)
-                    tf_logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J:.4f}")
-
-                if z >= self.c1:
-                    accept = True
-                else:
-                    alpha = max(self.alpha_min, alpha * self.rho)
-
-            x_hat, u_hat = x, u
-
-            if converged:
+            # convergence test
+            if residual < self.atol:
                 break
 
-        traj = trajectory.Trajectory(x_hat, u_hat, c)
+        traj = trajectory.Trajectory(x_hat, u_hat, c_hat)
 
         return traj, iteration
+
+    def _backward(self, T, u_hat, transition_model, cost_model, final_cost_model):
+        mu = 0.0
+        mu_min = 1e-6
+        mu_old = None
+        delta = 1.0
+        delta_0 = 2.0
+
+        optimally_regularized = False
+
+        while not optimally_regularized:
+            tf_logging.debug(f"[BACKWARD] mu = {mu}, delta = {delta}")
+
+            try:
+                start = time.time()
+                K, k, J_hat, dV1, dV2 = self.backward(T, u_hat, transition_model, cost_model, final_cost_model, mu)
+                uptime = time.time() - start
+
+                tf_logging.info(f"[BACKWARD] uptime = {uptime:.4f} sec")
+                tf_logging.info(f"[BACKWARD] J_hat = {J_hat:.4f}")
+
+                if mu == 0.0:
+                    optimally_regularized = True
+                elif not optimally_regularized:
+                    mu_old = mu
+                    delta = min(1 / delta_0, delta / delta_0)
+                    mu = mu * delta * (mu * delta > mu_min)
+
+            except tf.errors.InvalidArgumentError as e:
+                tf_logging.warn(f"[BACKWARD] could not run iLQR.backward : {e}")
+
+                if mu_old:
+                    mu = mu_old
+                    optimally_regularized = True
+                    continue
+
+                delta = max(delta_0, delta * delta_0)
+                mu = max(mu_min, mu * delta)
+
+            except Exception as e:
+                tf_logging.fatal(f"[BACKWARD] Error: {e}")
+                exit(-1)
+
+        return K, k, J_hat, dV1, dV2
+
+    def _forward(self, x_hat, u_hat, J_hat, K, k, dV1, dV2):
+
+        for alpha in np.geomspace(1.0, self.alpha_min, 11):
+            tf_logging.debug(f"[FORWARD] alpha = {alpha}")
+
+            start = time.time()
+            x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha)
+            uptime = time.time() - start
+
+            tf_logging.info(f"[FORWARD] uptime = {uptime:.4f} sec")
+            tf_logging.info(f"[FORWARD] J = {J:.4f}")
+            tf_logging.debug(f"[FORWARD] residual = {residual}")
+
+            if residual < self.atol:
+                break
+
+            delta_J = - alpha * (dV1 + alpha * dV2)
+            dcost = J_hat - J
+
+            if delta_J > 0:
+                z = dcost / delta_J
+            else:
+                z = tf.sign(dcost)
+                tf_logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J:.4f}")
+
+            tf_logging.debug(f"[FORWARD] dcost = {dcost}, delta_J = {delta_J:.4f}")
+            tf_logging.debug(f"[FORWARD] z = {z}, c1 = {self.c1}")
+
+            if z >= self.c1:
+                accept = True
+                break
+
+        return x, u, c, residual
+
+    def _get_unconstrained_controller(self, Q_uu, Q_ux, Q_u):
+        R = tf.linalg.cholesky(Q_uu)
+        kK = -tf.linalg.cholesky_solve(R, tf.concat([Q_u, Q_ux], axis=1))
+        k = kK[:,:1]
+        K = kK[:,1:]
+        return K, k
+
+    def _get_constrained_controller(self, u, Q_uu, Q_ux, Q_u):
+        low = self.env.action_space.low - u
+        high = self.env.action_space.high - u
+
+        k_0 = tf.zeros_like(u)
+        k, Hfree, free, clamped = optimization.projected_newton_qp(Q_uu, Q_u, low, high, k_0)
+
+        action_dim = self.env.action_size
+        state_dim = self.env.state_size
+        K = tf.Variable(tf.zeros([action_dim, state_dim]))
+
+        n_free = tf.math.count_nonzero(tf.squeeze(free))
+        if n_free > 0:
+            free = tf.squeeze(free)
+            Q_ux_f = Q_ux[free]
+            indices = tf.where(free)
+            values = - tf.linalg.cholesky_solve(Hfree, Q_ux_f)
+            K.scatter_nd_update(indices, values)
+
+        K = tf.constant(K.numpy())
+
+        return K, k

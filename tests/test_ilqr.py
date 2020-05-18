@@ -99,6 +99,8 @@ def test_forward(solver, initial_state, horizon):
     assert actions.shape == u.shape
     assert costs.shape == [horizon + 1]
 
+    assert tf.reduce_all(x[0] == states[0])
+
     for t in range(horizon):
         x, u, c = states[t], actions[t], costs[t]
         assert tf.reduce_all(states[t + 1] == solver.env.transition(x, u))
