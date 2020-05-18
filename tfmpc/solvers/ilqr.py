@@ -198,7 +198,9 @@ class iLQR:
         x_hat, u_hat = self.start(x0, T)
 
         for iteration in range(self.max_iterations):
-            tf_logging.info(f"[SOLVE] Iteration = {iteration}")
+            tf_logging.info(f"[SOLVE] >>>>>>> Iteration = {iteration} <<<<<<<")
+
+            start = time.time()
 
             # model approximation
             transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
@@ -239,6 +241,9 @@ class iLQR:
                     delta = max(self.delta_0, delta * self.delta_0)
                     mu = max(self.mu_min, mu * delta)
 
+            uptime = time.time() - start
+            tf_logging.info(f"[SOLVE] uptime = {uptime:.4f} sec")
+
             # convergence test
             if converged:
                 break
@@ -250,9 +255,11 @@ class iLQR:
     def _backward(self, T, u_hat, transition_model, cost_model, final_cost_model, mu, delta):
 
         done = False
+        num_iter = 0
 
         while not done:
-            tf_logging.debug(f"[BACKWARD] mu = {mu}, delta = {delta}")
+            num_iter += 1
+            tf_logging.debug(f"[BACKWARD] num_iter = {num_iter}, mu = {mu}, delta = {delta}")
 
             try:
                 start = time.time()
@@ -261,8 +268,8 @@ class iLQR:
 
                 done = True
 
-                tf_logging.info(f"[BACKWARD] uptime = {uptime:.4f} sec")
-                tf_logging.info(f"[BACKWARD] J_hat = {J_hat:.4f}")
+                tf_logging.info(f"[BACKWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec")
+                tf_logging.info(f"[BACKWARD] num_iter = {num_iter}, J_hat = {J_hat:.4f}")
 
             except tf.errors.InvalidArgumentError as e:
                 tf_logging.warn(f"[BACKWARD] could not run iLQR.backward : {e}")
@@ -279,16 +286,19 @@ class iLQR:
     def _forward(self, x_hat, u_hat, J_hat, K, k, dV1, dV2):
         accept = False
 
+        num_iter = 0
+
         for alpha in np.geomspace(1.0, self.alpha_min, 11):
-            tf_logging.debug(f"[FORWARD] alpha = {alpha}")
+            num_iter += 1
+
+            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, alpha = {alpha}")
 
             start = time.time()
             x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha)
             uptime = time.time() - start
 
-            tf_logging.info(f"[FORWARD] uptime = {uptime:.4f} sec")
-            tf_logging.info(f"[FORWARD] J = {J:.4f}")
-            tf_logging.debug(f"[FORWARD] residual = {residual}")
+            tf_logging.info(f"[FORWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec, J = {J:.4f}")
+            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, residual = {residual}")
 
             # if residual < self.atol:
             #     accept = True
@@ -303,8 +313,8 @@ class iLQR:
                 z = tf.sign(dcost)
                 tf_logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J:.4f}")
 
-            tf_logging.debug(f"[FORWARD] dcost = {dcost}, delta_J = {delta_J:.4f}")
-            tf_logging.debug(f"[FORWARD] z = {z}, c1 = {self.c1}")
+            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, dcost = {dcost}, delta_J = {delta_J:.4f}")
+            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, z = {z}, c1 = {self.c1}")
 
             if z >= self.c1:
                 accept = True

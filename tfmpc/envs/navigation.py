@@ -71,8 +71,8 @@ class Navigation(DiffEnv):
         bounds = f"[{low}, {high}]"
 
         center = self.deceleration["center"].numpy().tolist()
-        decay = self.deceleration["decay"].numpy().tolist()
-        deceleration = f"{{center={center}, decay={decay}}}"
+        decay = ", ".join([f"{d:.4f}" for d in self.deceleration["decay"].numpy().tolist()])
+        deceleration = f"{{center={center}, decay=[{decay}]}}"
 
         return f"Navigation(goal={goal}, deceleration={deceleration}, bounds={bounds})"
 
