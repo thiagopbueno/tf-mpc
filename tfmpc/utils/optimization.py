@@ -17,6 +17,8 @@ def projected_newton_qp(H, q, low, high, x, eps=1e-6, alpha_0=1.0, rho=0.5, c=1e
     armijo = 0.1
 
     clamped = tf.zeros_like(x)
+
+    # x = tf.clip_by_value(x, low, high)
     value = f(x)
 
     for iteration in range(max_iterations):

@@ -323,7 +323,9 @@ class iLQR:
         low = self.env.action_space.low - u
         high = self.env.action_space.high - u
 
-        k_0 = tf.zeros_like(u)
+        #k_0 = tf.zeros_like(u)
+        k_0 = (low + high) / 2
+
         k, Hfree, free, clamped = optimization.projected_newton_qp(Q_uu, Q_u, low, high, k_0)
 
         action_dim = self.env.action_size
