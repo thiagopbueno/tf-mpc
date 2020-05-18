@@ -1,9 +1,10 @@
 """
 Iterative Linear Quadratic Regulator (iLQR)
 
-Please see 'Synthesis and stabilization of complex behaviors
-through online trajectory optimization' (IROS, 2012)
-for algorithmic details and notation.
+For details please see:
+
+>> Control-Limited Differential Dynamic Programming (ICRA, 2014)
+>> Tassa, Mansard, and Todorov (2014)
 """
 
 import numpy as np
@@ -26,17 +27,23 @@ class iLQR:
         self.c1 = c1
         self.alpha_min = alpha_min
 
-        self.max_iterations = max_iterations
+    @property
+    def low(self):
+        return tf.constant(self.env.action_space.low)
+
+    @property
+    def high(self):
+        return tf.constant(self.env.action_space.high)
 
     @tf.function
     def start(self, x0, T):
         states = tf.TensorArray(dtype=tf.float32, size=T+1)
         actions = tf.TensorArray(dtype=tf.float32, size=T)
 
-        low = tf.constant(self.env.action_space.low)
+        low = self.low
         minval = tf.where(tf.math.is_inf(low), -tf.ones_like(low), low)
 
-        high = tf.constant(self.env.action_space.high)
+        high = self.high
         maxval = tf.where(tf.math.is_inf(high), tf.ones_like(high), high)
 
         states = states.write(0, x0)
@@ -152,11 +159,15 @@ class iLQR:
         state = x[0]
         residual = tf.constant(0.0)
 
+        low = self.low
+        high = self.high
+
         for t in tf.range(T):
             delta_x = state - x[t]
             delta_u = alpha * k[t] + tf.matmul(K[t], delta_x)
 
             action = u[t] + delta_u
+            action = tf.clip_by_value(action, low, high)
             cost = self.env.cost(state, action)
             state = self.env.transition(state, action)
 
