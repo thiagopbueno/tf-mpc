@@ -137,7 +137,7 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
 @click.option(
     "--atol",
     type=click.FloatRange(min=0.0),
-    default=1e-4,
+    default=5e-3,
     help="Absolute tolerance for convergence.",
     show_default=True)
 @click.option(

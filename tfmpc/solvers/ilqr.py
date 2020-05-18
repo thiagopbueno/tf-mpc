@@ -19,11 +19,18 @@ from tfmpc.utils import trajectory
 
 class iLQR:
 
-    def __init__(self, env, atol=1e-4, c1=0.0, alpha_min=1e-3, max_iterations=100):
+    def __init__(self, env, atol=5e-3, max_iterations=100, mu_min=1e-6, delta_0=2.0, c1=0.0, alpha_min=1e-3):
         self.env = env
 
+        # solve
         self.atol = atol
+        self.max_iterations = max_iterations
 
+        # backward
+        self.mu_min = mu_min
+        self.delta_0 = delta_0
+
+        # forward
         self.c1 = c1
         self.alpha_min = alpha_min
 
