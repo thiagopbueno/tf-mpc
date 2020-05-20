@@ -1,13 +1,15 @@
 import tensorflow as tf
 
+from tfmpc.envs.diffenv import DiffEnv
 
-class Reservoir:
 
-    BIGGESTMAXCAP = 1000
+class Reservoir(DiffEnv):
 
-    LOW_PENALTY = 5.0
-    HIGH_PENALTY = 100.0
-    SET_POINT_PENALTY = 0.1
+    BIGGESTMAXCAP = tf.constant(1000, dtype=tf.float32)
+
+    LOW_PENALTY = tf.constant(5.0, dtype=tf.float32)
+    HIGH_PENALTY = tf.constant(100.0, dtype=tf.float32)
+    SET_POINT_PENALTY = tf.constant(0.1, dtype=tf.float32)
 
     def __init__(self,
                  lower_bound,
