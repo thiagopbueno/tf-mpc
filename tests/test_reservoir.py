@@ -158,7 +158,7 @@ def test_transition(env):
     state = sample_state(env)
     action = sample_action(env)
 
-    next_state = env.transition(state, action, batch=tf.constant(False))
+    next_state = env.transition(state, action, batch=False)
     assert next_state.shape == state.shape
 
     balance = (
@@ -176,7 +176,7 @@ def test_transition_batch(env):
     state = sample_state(env, batch_size)
     action = sample_action(env, batch_size)
 
-    next_state = env.transition(state, action, batch=tf.constant(True))
+    next_state = env.transition(state, action, batch=True)
     assert next_state.shape == [batch_size, env.state_size, 1]
 
     balance = (
@@ -192,9 +192,9 @@ def test_transition_batch(env):
 def test_linear_transition_model(env):
     state = sample_state(env)
     action = sample_action(env)
-    next_state = env.transition(state, action, batch=tf.constant(False))
+    next_state = env.transition(state, action, batch=False)
 
-    model = env.get_linear_transition(state, action, batch=tf.constant(False))
+    model = env.get_linear_transition(state, action, batch=False)
     f = model.f
     f_x = model.f_x
     f_u = model.f_u
@@ -222,9 +222,9 @@ def test_linear_transition_model_batch(env):
     batch_size = 5
     state = sample_state(env, batch_size=batch_size)
     action = sample_action(env, batch_size=batch_size)
-    next_state = env.transition(state, action, batch=tf.constant(True))
+    next_state = env.transition(state, action, batch=True)
 
-    model = env.get_linear_transition(state, action, batch=tf.constant(True))
+    model = env.get_linear_transition(state, action, batch=True)
     f = model.f
     f_x = model.f_x
     f_u = model.f_u
@@ -265,7 +265,7 @@ def test_cost_batch(env):
     state = sample_state(env, batch_size)
     action = sample_action(env, batch_size)
 
-    cost = env.cost(state, action, batch=tf.constant(True))
+    cost = env.cost(state, action, batch=True)
     assert cost.shape == [batch_size,]
 
 
@@ -274,7 +274,7 @@ def test_quadratic_cost_model(env):
     action = sample_action(env)
     cost = env.cost(state, action)
 
-    model = env.get_quadratic_cost(state, action)
+    model = env.get_quadratic_cost(state, action, batch=False)
     l = model.l
     l_x = model.l_x
     l_u = model.l_u
@@ -320,9 +320,9 @@ def test_quadratic_cost_model_batch(env):
     batch_size = 10
     state = sample_state(env, batch_size)
     action = sample_action(env, batch_size)
-    cost = env.cost(state, action, batch=tf.constant(True))
+    cost = env.cost(state, action, batch=True)
 
-    model = env.get_quadratic_cost(state, action, batch=tf.constant(True))
+    model = env.get_quadratic_cost(state, action, batch=True)
     l = model.l
     l_x = model.l_x
     l_u = model.l_u

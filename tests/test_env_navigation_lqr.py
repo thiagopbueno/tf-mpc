@@ -29,7 +29,7 @@ def test_linear_transition(env):
         x = tf.random.normal((2, 1))
         u = tf.random.uniform((2, 1))
 
-        model = env.get_linear_transition(x, u)
+        model = env.get_linear_transition(x, u, batch=False)
         f = model.f
         f_x = model.f_x
         f_u = model.f_u
@@ -72,7 +72,7 @@ def test_quadratic_cost(env):
         x = tf.random.normal((2, 1))
         u = tf.random.uniform((2, 1))
 
-        model = env.get_quadratic_cost(x, u)
+        model = env.get_quadratic_cost(x, u, batch=False)
         l = model.l
         l_x = model.l_x
         l_u = model.l_u
