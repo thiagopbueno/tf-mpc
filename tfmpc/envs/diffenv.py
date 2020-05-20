@@ -11,7 +11,7 @@ FinalCostApprox = namedtuple("CostApprox", "l l_x l_xx")
 class DiffEnv:
 
     @tf.function
-    def get_linear_transition(self, state, action, batch=False):
+    def get_linear_transition(self, state, action, batch=tf.constant(False)):
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             tape.watch(action)
@@ -31,7 +31,7 @@ class DiffEnv:
         return TransitionApprox(f, f_x, f_u)
 
     @tf.function
-    def get_quadratic_cost(self, state, action, batch=False):
+    def get_quadratic_cost(self, state, action, batch=tf.constant(False)):
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             tape.watch(action)
