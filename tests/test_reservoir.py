@@ -158,7 +158,7 @@ def test_transition(env):
     state = sample_state(env)
     action = sample_action(env)
 
-    next_state = env.transition(state, action)
+    next_state = env.transition(state, action, batch=tf.constant(False))
     assert next_state.shape == state.shape
 
     balance = (
@@ -189,6 +189,69 @@ def test_transition_batch(env):
     assert tf.reduce_all(tf.abs(balance) < 1e-3)
 
 
+def test_linear_transition_model(env):
+    state = sample_state(env)
+    action = sample_action(env)
+    next_state = env.transition(state, action, batch=tf.constant(False))
+
+    model = env.get_linear_transition(state, action, batch=tf.constant(False))
+    f = model.f
+    f_x = model.f_x
+    f_u = model.f_u
+
+    assert tf.reduce_all(tf.abs(f - next_state) < 1e-3)
+
+    a_t = tf.squeeze(action)
+    s_t = tf.squeeze(state)
+    C = env.BIGGESTMAXCAP
+    grad_v_s = tf.linalg.diag(1/2 * (tf.cos(s_t/C) * s_t/C + tf.sin(s_t/C)))
+    grad_F_s = tf.linalg.diag(a_t)
+    grad_I_s = tf.matmul(env.downstream, tf.linalg.diag(a_t), transpose_a=True)
+    f_x_expected = tf.eye(env.state_size) - grad_v_s - grad_F_s + grad_I_s
+    assert f_x.shape == f_x_expected.shape
+    assert tf.reduce_all(tf.abs(f_x - f_x_expected) < 1e-3)
+
+    grad_F_a = tf.linalg.diag(s_t)
+    grad_I_a = tf.matmul(env.downstream, tf.linalg.diag(s_t), transpose_a=True)
+    f_u_expected = - grad_F_a + grad_I_a
+    assert f_u.shape == f_u_expected.shape
+    assert tf.reduce_all(tf.abs(f_u - f_u_expected) < 1e-3)
+
+
+def test_linear_transition_model_batch(env):
+    batch_size = 5
+    state = sample_state(env, batch_size=batch_size)
+    action = sample_action(env, batch_size=batch_size)
+    next_state = env.transition(state, action, batch=tf.constant(True))
+
+    model = env.get_linear_transition(state, action, batch=tf.constant(True))
+    f = model.f
+    f_x = model.f_x
+    f_u = model.f_u
+
+    assert f.shape == [batch_size, env.state_size, 1]
+    assert f_x.shape == [batch_size, env.state_size, env.state_size]
+    assert f_u.shape == [batch_size, env.state_size, env.action_size]
+
+    assert tf.reduce_all(tf.abs(f - next_state) < 1e-3)
+
+    a_t = tf.squeeze(action)
+    s_t = tf.squeeze(state)
+    C = env.BIGGESTMAXCAP
+    grad_v_s = tf.linalg.diag(1/2 * (tf.cos(s_t/C) * s_t/C + tf.sin(s_t/C)))
+    grad_F_s = tf.linalg.diag(a_t)
+    grad_I_s = tf.matmul(env.downstream, tf.linalg.diag(a_t), transpose_a=True)
+    f_x_expected = tf.eye(env.state_size) - grad_v_s - grad_F_s + grad_I_s
+    assert f_x.shape == f_x_expected.shape
+    assert tf.reduce_all(tf.abs(f_x - f_x_expected) < 1e-3)
+
+    grad_F_a = tf.linalg.diag(s_t)
+    grad_I_a = tf.matmul(env.downstream, tf.linalg.diag(s_t), transpose_a=True)
+    f_u_expected = - grad_F_a + grad_I_a
+    assert f_u.shape == f_u_expected.shape
+    assert tf.reduce_all(tf.abs(f_u - f_u_expected) < 1e-3)
+
+
 def test_cost(env):
     state = sample_state(env)
     action = sample_action(env)
@@ -204,3 +267,96 @@ def test_cost_batch(env):
 
     cost = env.cost(state, action, batch=tf.constant(True))
     assert cost.shape == [batch_size,]
+
+
+def test_quadratic_cost_model(env):
+    state = sample_state(env)
+    action = sample_action(env)
+    cost = env.cost(state, action)
+
+    model = env.get_quadratic_cost(state, action)
+    l = model.l
+    l_x = model.l_x
+    l_u = model.l_u
+    l_xx = model.l_xx
+    l_uu = model.l_uu
+    l_ux = model.l_ux
+    l_xu = model.l_xu
+
+    assert l == cost
+
+    s_t = tf.squeeze(state)
+    LB = tf.squeeze(env.lower_bound)
+    UB = tf.squeeze(env.upper_bound)
+    HP = env.HIGH_PENALTY
+    LP = env.LOW_PENALTY
+    SPP = env.SET_POINT_PENALTY
+
+    e1 = HP * tf.cast(((s_t - UB) > 0.0), tf.float32)
+    e2 = -LP * tf.cast(((LB - s_t) > 0.0), tf.float32)
+    e3 = -SPP * tf.sign((UB + LB) / 2 - s_t)
+    l_x_expected = tf.expand_dims(e1 + e2 + e3, -1)
+
+    assert l_x.shape == state.shape
+    assert tf.reduce_all(tf.abs(l_x - l_x_expected) < 1e-3)
+
+    assert l_u.shape == action.shape
+    assert tf.reduce_all(l_u == tf.zeros_like(action))
+
+    assert l_xx.shape == [env.state_size, env.state_size]
+    assert tf.reduce_all(l_xx == tf.zeros([env.state_size, env.state_size]))
+
+    assert l_uu.shape == [env.action_size, env.action_size]
+    assert tf.reduce_all(l_uu == tf.zeros([env.action_size, env.action_size]))
+
+    assert l_ux.shape == [env.action_size, env.state_size]
+    assert tf.reduce_all(l_ux == tf.zeros([env.action_size, env.state_size]))
+
+    assert l_xu.shape == [env.state_size, env.action_size]
+    assert tf.reduce_all(l_xu == tf.zeros([env.state_size, env.action_size]))
+
+
+def test_quadratic_cost_model_batch(env):
+    batch_size = 10
+    state = sample_state(env, batch_size)
+    action = sample_action(env, batch_size)
+    cost = env.cost(state, action, batch=tf.constant(True))
+
+    model = env.get_quadratic_cost(state, action, batch=tf.constant(True))
+    l = model.l
+    l_x = model.l_x
+    l_u = model.l_u
+    l_xx = model.l_xx
+    l_uu = model.l_uu
+    l_ux = model.l_ux
+    l_xu = model.l_xu
+
+    assert l.shape == [batch_size,]
+    assert l_x.shape == [batch_size, env.state_size, 1]
+    assert l_u.shape == [batch_size, env.action_size, 1]
+    assert l_xx.shape == [batch_size, env.state_size, env.state_size]
+    assert l_uu.shape == [batch_size, env.action_size, env.action_size]
+    assert l_xu.shape == [batch_size, env.state_size, env.action_size]
+    assert l_ux.shape == [batch_size, env.action_size, env.state_size]
+
+    assert tf.reduce_all(tf.abs(l - cost) < 1e-3)
+
+    s_t = tf.squeeze(state)
+    LB = tf.squeeze(env.lower_bound)
+    UB = tf.squeeze(env.upper_bound)
+    HP = env.HIGH_PENALTY
+    LP = env.LOW_PENALTY
+    SPP = env.SET_POINT_PENALTY
+
+    e1 = HP * tf.cast(((s_t - UB) > 0.0), tf.float32)
+    e2 = -LP * tf.cast(((LB - s_t) > 0.0), tf.float32)
+    e3 = -SPP * tf.sign((UB + LB) / 2 - s_t)
+    l_x_expected = tf.expand_dims(e1 + e2 + e3, -1)
+
+    assert tf.reduce_all(tf.abs(l_x - l_x_expected) < 1e-3)
+
+    assert tf.reduce_all(l_u == tf.zeros_like(action))
+    assert tf.reduce_all(l_xx == tf.zeros([batch_size, env.state_size, env.state_size]))
+    assert tf.reduce_all(l_uu == tf.zeros([batch_size, env.action_size, env.action_size]))
+    assert tf.reduce_all(l_ux == tf.zeros([batch_size, env.action_size, env.state_size]))
+    assert tf.reduce_all(l_xu == tf.zeros([batch_size, env.state_size, env.action_size]))
