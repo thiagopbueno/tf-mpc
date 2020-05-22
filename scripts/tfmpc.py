@@ -139,6 +139,12 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     help="Absolute tolerance for convergence.",
     show_default=True)
 @click.option(
+    "--max-iterations", "-miter",
+    type=click.IntRange(min=1),
+    default=100,
+    help="Maximum number of iterations.",
+    show_default=True)
+@click.option(
     "--debug",
     is_flag=True,
     help="Debug flag.")
