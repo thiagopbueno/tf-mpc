@@ -79,9 +79,13 @@ class DiffEnv:
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(state)
             l = self.final_cost(state)
-            l_x = tape.gradient(l, state)
+            l_x = tape.gradient(
+                l, state,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        l_xx = tape.jacobian(l_x, state)
+        l_xx = tape.jacobian(
+            l_x, state,
+            unconnected_gradients=tf.UnconnectedGradients.ZERO)
         l_xx = tf.squeeze(l_xx)
 
         del tape
