@@ -1,3 +1,5 @@
+import gym
+import numpy as np
 import tensorflow as tf
 
 from tfmpc.envs.diffenv import DiffEnv
@@ -20,6 +22,12 @@ class Reservoir(DiffEnv):
         self.upper_bound = upper_bound
         self.downstream = downstream
         self.rain = rain
+
+        self.obs_space = gym.spaces.Box(
+            shape=[self.state_size, 1], low=0.0, high=self.BIGGESTMAXCAP.numpy())
+
+        self.action_space = gym.spaces.Box(
+            shape=[self.action_size, 1], low=0.0, high=1.0)
 
     @property
     def state_size(self):
@@ -62,8 +70,8 @@ class Reservoir(DiffEnv):
         return total_cost
 
     @tf.function
-    def final_cost(self, state, action, batch=tf.constant(False)):
-        return self.cost(state, action, batch)
+    def final_cost(self, state):
+        return self.cost(state, None)
 
     @tf.function
     def _vaporated(self, rlevel):
@@ -92,3 +100,10 @@ class Reservoir(DiffEnv):
 
         return f"Reservoir(\nbounds={bounds},\ntopology=\n{topology},\nrain={rain})"
 
+    @classmethod
+    def load(cls, config):
+        kwargs = {
+            key: tf.constant(val, dtype=tf.float32)
+            for key, val in config.items()
+        }
+        return cls(**kwargs)
