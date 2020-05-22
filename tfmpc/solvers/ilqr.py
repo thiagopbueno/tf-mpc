@@ -7,9 +7,10 @@ For details please see:
 >> Tassa, Mansard, and Todorov (2014)
 """
 
-import numpy as np
 import pprint
 import time
+
+import numpy as np
 import tensorflow as tf
 import tensorflow.compat.v1.logging as tf_logging
 
@@ -263,7 +264,8 @@ class iLQR:
 
             try:
                 start = time.time()
-                K, k, J_hat, dV1, dV2 = self.backward(T, u_hat, transition_model, cost_model, final_cost_model, mu)
+                mu_ = tf.constant(mu, dtype=tf.float32)
+                K, k, J_hat, dV1, dV2 = self.backward(T, u_hat, transition_model, cost_model, final_cost_model, mu_)
                 uptime = time.time() - start
 
                 done = True
@@ -294,7 +296,8 @@ class iLQR:
             tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, alpha = {alpha}")
 
             start = time.time()
-            x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha)
+            alpha_ = tf.constant(alpha, dtype=tf.float32)
+            x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha_)
             uptime = time.time() - start
 
             tf_logging.info(f"[FORWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec, J = {J:.4f}")
