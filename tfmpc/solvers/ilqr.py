@@ -119,7 +119,11 @@ class iLQR:
             Q_ux_reg = tf.transpose(l_xu) + tf.matmul(f_u_trans_V_xx_reg, f_x)
 
             if self.env.action_space.is_bounded():
-                K_t, k_t = tf.py_function(self._get_constrained_controller, inp=[actions[t], Q_uu_reg, Q_ux_reg, Q_u], Tout=[tf.float32, tf.float32])
+                if tf.math.count_nonzero(V_xx) > 0:
+                    K_t, k_t = tf.py_function(self._get_constrained_controller, inp=[actions[t], Q_uu_reg, Q_ux_reg, Q_u], Tout=[tf.float32, tf.float32])
+                else:
+                    K_t = tf.zeros([self.env.action_size, self.env.state_size])
+                    k_t = tf.where(Q_u >= 0.0, self.env.action_space.low - actions[t], self.env.action_space.high - actions[t])
             else:
                 K_t, k_t = self._get_unconstrained_controller(Q_uu_reg, Q_ux_reg, Q_u)
 
