@@ -145,14 +145,10 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     help="Maximum number of iterations.",
     show_default=True)
 @click.option(
-    "--debug",
-    is_flag=True,
-    help="Debug flag.")
-@click.option(
     "--verbose", "-v",
-    is_flag=True,
-    help="Verbosity flag.")
-def ilqr(config, horizon, atol, max_iterations, debug, verbose):
+    count=True,
+    help="Verbosity level flag.")
+def ilqr(config, horizon, atol, max_iterations, verbose):
     """Run iLQR for a given environment and horizon.
 
     Args:
@@ -160,11 +156,14 @@ def ilqr(config, horizon, atol, max_iterations, debug, verbose):
         CONFIG: Path to the environment's config JSON file.
     """
 
-    if verbose:
-        tf_logging.set_verbosity(tf_logging.INFO)
+    if verbose == 1:
+        level = tf_logging.INFO
+    elif verbose == 2:
+        level = tf_logging.DEBUG
+    else:
+        level = tf_logging.ERROR
 
-    if debug:
-        tf_logging.set_verbosity(tf_logging.DEBUG)
+    tf_logging.set_verbosity(level)
 
     with open(config, "r") as file:
         config = json.load(file)
