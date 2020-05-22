@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import json
+import os
+
 import click
 import gym
 import numpy as np
-import os
 import tensorflow as tf
 import tensorflow.compat.v1.logging as tf_logging
 
@@ -123,11 +125,7 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
 
 
 @cli.command()
-@click.argument("initial-state")
-@click.option(
-    "--config", "-c",
-    type=click.Path(exists=True),
-    help="Path to the environment's config JSON file.")
+@click.argument("config", type=click.Path(exists=True))
 @click.option(
     "--horizon", "-hr",
     type=click.IntRange(min=1),
@@ -148,12 +146,12 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     "--verbose", "-v",
     is_flag=True,
     help="Verbosity flag.")
-def ilqr(initial_state, config, horizon, atol, debug, verbose):
-    """Run iLQR for the given environment and config.
+def ilqr(config, horizon, atol, max_iterations, debug, verbose):
+    """Run iLQR for a given environment and horizon.
 
     Args:
 
-        INITIAL_STATE: list of floats.
+        CONFIG: Path to the environment's config JSON file.
     """
 
     if verbose:
@@ -162,14 +160,14 @@ def ilqr(initial_state, config, horizon, atol, debug, verbose):
     if debug:
         tf_logging.set_verbosity(tf_logging.DEBUG)
 
+    with open(config, "r") as file:
+        config = json.load(file)
+
     env = envs.make_env(config)
     print(env)
     print()
 
-    initial_state = list(map(float, initial_state.split()))
-    state_dim = len(initial_state)
-    x0 = tf.constant(initial_state, dtype=tf.float32, shape=[state_dim, 1])
-
+    x0 = tf.constant(config["initial_state"], dtype=tf.float32)
     T = tf.constant(horizon)
 
     solver = tfmpc.solvers.ilqr.iLQR(env, atol=atol)
