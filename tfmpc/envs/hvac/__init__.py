@@ -129,11 +129,11 @@ class HVAC(DiffEnv):
         )
 
     @tf.function
-    def _conduction_between_rooms(self, temp):
+    def _conduction_between_rooms(self, temp, batch=False):
         adj = tf.logical_or(self.adj, tf.transpose(self.adj))
         adj = tf.cast(adj, tf.float32)
         return tf.reduce_sum(
-            - adj / self.R_wall * (temp - tf.transpose(temp)),
+            - adj / self.R_wall * (temp - tf.linalg.matrix_transpose(temp)),
             axis=-1,
             keepdims=True
         )

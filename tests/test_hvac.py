@@ -96,6 +96,19 @@ def test_transition(env):
     assert next_state.shape == state.shape
 
 
+def test_transition_batch(env):
+    batch_size = 10
+    state = sample_state(env, batch_size)
+    action = sample_action(env, batch_size)
+
+    next_state = env.transition(state, action, batch=True)
+    assert next_state.shape == [batch_size, env.state_size, 1]
+
+    for i, (s, a) in enumerate(zip(state, action)):
+        next_s = env.transition(s, a, batch=False)
+        assert tf.reduce_all(next_s == next_state[i])
+
+
 def test_conduction_between_rooms(env):
     state = sample_state(env)
 
@@ -155,6 +168,20 @@ def test_cost(env):
     cost = env.cost(state, action)
     assert cost.shape == []
     assert cost >= 0.0
+
+
+def test_cost_batch(env):
+    batch_size = 10
+    state = sample_state(env, batch_size)
+    action = sample_action(env, batch_size)
+
+    cost = env.cost(state, action, batch=True)
+    assert cost.shape == [batch_size,]
+    assert tf.reduce_all(cost >= 0.0)
+
+    for i, (s, a) in enumerate(zip(state, action)):
+        c = env.cost(s, a, batch=False)
+        assert tf.reduce_all(c == cost[i])
 
 
 def test_final_cost(env):
