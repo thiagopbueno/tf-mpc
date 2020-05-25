@@ -161,6 +161,22 @@ def test_linear_transition(env):
     assert tf.reduce_all(tf.abs(model.f_u - expected_f_u) < 1e-3)
 
 
+def test_linear_transition_batch(env):
+    batch_size = 10
+    state = sample_state(env, batch_size)
+    action = sample_action(env, batch_size)
+
+    model = env.get_linear_transition(state, action, batch=True)
+
+    for i, (s, a) in enumerate(zip(state, action)):
+        m_i = env.get_linear_transition(s, a, batch=False)
+        assert len(m_i) == len(model) == 3
+        for f1, f2 in zip(model, m_i):
+            assert f1.shape[0] == batch_size
+            assert f1[i].shape == f2.shape
+            assert tf.reduce_all(tf.abs(f1[i] - f2) < 1e-3)
+
+
 def test_conduction_between_rooms(env):
     state = sample_state(env)
 
@@ -286,3 +302,19 @@ def test_quadratic_cost(env):
     assert tf.reduce_all(model.l_uu == tf.zeros([env.state_size, env.state_size]))
     assert tf.reduce_all(model.l_xu == tf.zeros([env.state_size, env.state_size]))
     assert tf.reduce_all(model.l_ux == tf.zeros([env.state_size, env.state_size]))
+
+
+def test_quadratic_cost_batch(env):
+    batch_size = 10
+    state = sample_state(env, batch_size)
+    action = sample_action(env, batch_size)
+
+    model = env.get_quadratic_cost(state, action, batch=True)
+
+    for i, (s, a) in enumerate(zip(state, action)):
+        m_i = env.get_quadratic_cost(s, a, batch=False)
+        assert len(model) == len(m_i) == 7
+        for l1, l2 in zip(model, m_i):
+            assert l1.shape[0] == batch_size
+            assert l1[i].shape == l2.shape
+            assert tf.reduce_all(tf.abs(l1[i] - l2) < 1e-3)
