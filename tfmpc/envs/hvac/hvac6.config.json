@@ -1,0 +1,33 @@
+{
+    "module": "hvac",
+    "cls_name": "HVAC",
+    "config": {
+	"temp_outside": [[6.0], [6.0], [6.0], [6.0], [6.0], [6.0]],
+	"temp_hall": [[10.0], [10.0], [10.0], [10.0], [10.0], [10.0]],
+	"temp_lower_bound": [[20.0], [20.0], [20.0], [20.0], [20.0], [20.0]],
+	"temp_upper_bound": [[23.5], [23.5], [23.5], [23.5], [23.5], [23.5]],
+	"R_outside": [[4.0], [4.0], [4.0], [4.0], [4.0], [4.0]],
+	"R_hall": [[2.0], [2.0], [2.0], [2.0], [2.0], [2.0]],
+	"R_wall": [
+	    [1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+	    [1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+	    [1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+	    [1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+	    [1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+	    [1.5, 1.5, 1.5, 1.5, 1.5, 1.5]
+	],
+	"capacity": [[80.0], [80.0], [80.0], [80.0], [80.0], [80.0]],
+	"air_max": [[10.0], [10.0], [10.0], [10.0], [10.0], [10.0]],
+	"adj": [
+	    [false, true, false, true, false, false],
+	    [false, false, true, false, true, false],
+	    [false, false, false, false, false, true],
+	    [false, false, false, false, true, false],
+	    [false, false, false, false, false, true],
+	    [false, false, false, false, false, false]
+	],
+	"adj_outside": [[true], [false], [true], [true], [false], [true]],
+	"adj_hall": [[true], [true], [true], [true], [true], [true]]
+    },
+    "initial_state": [[10.0], [10.0], [10.0], [10.0], [10.0], [10.0]]
+}
