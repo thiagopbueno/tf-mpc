@@ -185,3 +185,11 @@ class HVAC(DiffEnv):
         temp_hall = f"[{', '.join(temp_hall)}]"
 
         return f"HVAC(\ntemp_bounds={bounds},\nR=\n{R},\nR_wall=\n{R_wall},\ncapacity={capacity},\nair_max={air_max},\nadj=\n{adj},\nadj_outside={adj_outside},\nadj_hall={adj_hall},\ntemp_outside={temp_outside},\ntemp_hall={temp_hall}\n)"
+    @classmethod
+    def load(cls, config):
+        for key, value in config.items():
+            if key.startswith("adj"):
+                config[key] = tf.constant(value, dtype=tf.bool)
+            else:
+                config[key] = tf.constant(value, dtype=tf.float32)
+        return cls(**config)
