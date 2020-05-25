@@ -109,6 +109,58 @@ def test_transition_batch(env):
         assert tf.reduce_all(next_s == next_state[i])
 
 
+def test_linear_transition(env):
+    state = sample_state(env)
+    action = sample_action(env)
+
+    model = env.get_linear_transition(state, action, batch=False)
+
+    # check f
+    next_state = env.transition(state, action, batch=False)
+    assert model.f.shape == next_state.shape
+    assert tf.reduce_all(model.f == next_state)
+
+    # check f_x
+    air = action * env.air_max
+    heating_x = - tf.linalg.diag(tf.squeeze(air * env.CAP_AIR))
+
+    adj = tf.logical_or(env.adj, tf.transpose(env.adj))
+    adj = tf.cast(adj, tf.float32)
+    conduction_between_rooms_x = - adj / env.R_wall * (-tf.ones_like(adj))
+
+    adj_outside = tf.cast(env.adj_outside, tf.float32)
+    conduction_with_outside_x = - tf.linalg.diag(
+        tf.squeeze(adj_outside / env.R_outside))
+
+    adj_hall = tf.cast(env.adj_hall, tf.float32)
+    conduction_with_hall_x = - tf.linalg.diag(
+        tf.squeeze(adj_hall / env.R_hall))
+
+    C = tf.linalg.diag(tf.squeeze(env.TIME_DELTA / env.capacity))
+    expected_f_x = (
+        tf.eye(env.state_size)
+        + tf.matmul(C,
+            heating_x
+            + conduction_between_rooms_x
+            + conduction_with_outside_x
+            + conduction_with_hall_x
+        )
+    )
+
+    # print(expected_f_x)
+    # print(model.f_x)
+    assert expected_f_x.shape == model.f_x.shape
+    # assert tf.reduce_all(tf.abs(model.f_x - expected_f_x) < 1e-3)
+
+    # check f_u
+    temp = state
+    expected_f_u = tf.linalg.diag(
+        tf.squeeze(
+            env.TIME_DELTA / env.capacity * env.air_max * env.CAP_AIR * (env.TEMP_AIR - temp)))
+    assert model.f_u.shape == expected_f_u.shape
+    assert tf.reduce_all(tf.abs(model.f_u - expected_f_u) < 1e-3)
+
+
 def test_conduction_between_rooms(env):
     state = sample_state(env)
 
@@ -190,3 +242,47 @@ def test_final_cost(env):
     final_cost = env.final_cost(state)
     assert final_cost.shape == []
     assert final_cost >= 0.0
+
+
+def test_quadratic_cost(env):
+    state = sample_state(env)
+    action = sample_action(env)
+
+    model = env.get_quadratic_cost(state, action, batch=False)
+
+    # check l
+    assert model.l == env.cost(state, action, batch=False)
+
+    # check l_x
+    temp = state
+
+    below_limit = - tf.linalg.diag(
+        tf.squeeze(tf.sign(tf.maximum(0.0, env.temp_lower_bound - temp))))
+    above_limit = tf.linalg.diag(
+        tf.squeeze(tf.sign(tf.maximum(0.0, temp - env.temp_upper_bound))))
+    out_of_bounds_penalty_x = (
+        env.PENALTY * (below_limit + above_limit)
+    )
+
+    set_point_penalty_x = - env.SET_POINT_PENALTY * tf.linalg.diag(
+        tf.squeeze(tf.sign(
+            (env.temp_lower_bound + env.temp_upper_bound) / 2 - temp)))
+
+    expected_l_x = tf.reduce_sum(
+        out_of_bounds_penalty_x + set_point_penalty_x,
+        axis=-1,
+        keepdims=True)
+
+    assert model.l_x.shape == expected_l_x.shape
+    assert tf.reduce_all(tf.abs(model.l_x - expected_l_x) < 1e-3)
+
+    # check l_u
+    expected_l_u = env.air_max * env.COST_AIR
+    assert model.l_u.shape == expected_l_u.shape
+    assert tf.reduce_all(tf.abs(model.l_u - expected_l_u) < 1e-3)
+
+    # check all 2nd order derivatives are null
+    assert tf.reduce_all(model.l_xx == tf.zeros([env.state_size, env.state_size]))
+    assert tf.reduce_all(model.l_uu == tf.zeros([env.state_size, env.state_size]))
+    assert tf.reduce_all(model.l_xu == tf.zeros([env.state_size, env.state_size]))
+    assert tf.reduce_all(model.l_ux == tf.zeros([env.state_size, env.state_size]))
