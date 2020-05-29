@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 class Trajectory:
@@ -60,3 +61,20 @@ class Trajectory:
             transition = " | ".join(transition)
             rslt += transition + "\n"
         return rslt
+
+    def save(self, filepath):
+        df = pd.DataFrame()
+
+        states = np.transpose(self.states[1:])
+        for i, x_i in enumerate(states):
+            label = f"x[{i+1}]"
+            df[label] = x_i
+
+        actions = np.transpose(self.actions)
+        for i, u_i in enumerate(actions):
+            label = f"u[{i+1}]"
+            df[label] = u_i
+
+        df["costs"] = self.costs[:-1]
+
+        df.to_csv(filepath, index=True, index_label="Timestep")

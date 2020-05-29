@@ -145,10 +145,14 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     help="Maximum number of iterations.",
     show_default=True)
 @click.option(
+    "--output", "-o",
+    type=click.Path(),
+    help="Path to output file.")
+@click.option(
     "--verbose", "-v",
     count=True,
     help="Verbosity level flag.")
-def ilqr(config, horizon, atol, max_iterations, verbose):
+def ilqr(config, horizon, atol, max_iterations, output, verbose):
     """Run iLQR for a given environment and horizon.
 
     Args:
@@ -181,3 +185,6 @@ def ilqr(config, horizon, atol, max_iterations, verbose):
     print(repr(trajectory))
     print()
     print(str(trajectory))
+
+    if output:
+        trajectory.save(output)
