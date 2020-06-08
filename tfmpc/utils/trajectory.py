@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -76,5 +78,9 @@ class Trajectory:
             df[label] = u_i
 
         df["costs"] = self.costs[:-1]
+
+        dirname = os.path.dirname(filepath)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
 
         df.to_csv(filepath, index=True, index_label="Timestep")
