@@ -18,27 +18,27 @@ def trajectory():
 
 
 def test_initial_state(trajectory):
-    assert np.allclose(trajectory.initial_state, trajectory.states[0])
+    assert np.allclose(trajectory.initial_state, trajectory.states[0], atol=1e-3)
 
 
 def test_final_state(trajectory):
-    assert np.allclose(trajectory.final_state, trajectory.states[-1])
+    assert np.allclose(trajectory.final_state, trajectory.states[-1], atol=1e-3)
 
 
 def test_total_cost(trajectory):
-    assert trajectory.total_cost == sum(c for c in trajectory.costs)
+    assert np.allclose(trajectory.total_cost, sum(trajectory.costs), atol=1e-3)
 
 
 def test_cumulative_cost(trajectory):
     costs = trajectory.costs
     expected = [np.sum(costs[: t + 1]) for t in range(len(costs))]
-    assert np.allclose(trajectory.cumulative_cost, expected)
+    assert np.allclose(trajectory.cumulative_cost, expected, atol=1e-3)
 
 
 def test_cost_to_go(trajectory):
     costs = trajectory.costs
     expected = [np.sum(costs[t:]) for t in range(len(costs))]
-    assert np.allclose(trajectory.cost_to_go, expected)
+    assert np.allclose(trajectory.cost_to_go, expected, atol=1e-3)
 
 
 def test_len(trajectory):
@@ -49,8 +49,8 @@ def test_len(trajectory):
 
 def test_getitem(trajectory):
     for t, (x, u, c) in enumerate(trajectory):
-        assert np.allclose(x, trajectory.states[t + 1])
-        assert np.allclose(u, trajectory.actions[t])
+        assert np.allclose(x, trajectory.states[t + 1], atol=1e-3)
+        assert np.allclose(u, trajectory.actions[t], atol=1e-3)
         assert c == trajectory.costs[t]
 
 
