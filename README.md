@@ -1,4 +1,4 @@
-# tf-mpc [![Build Status](https://travis-ci.org/thiagopbueno/tf-mpc.svg?branch=master)](https://travis-ci.org/thiagopbueno/tf-mpc) [![Documentation Status](https://readthedocs.org/projects/tfmpc/badge/?version=latest)](https://tfmpc.readthedocs.io/en/latest/?badge=latest) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/thiagopbueno/tf-mpc/blob/master/LICENSE)
+# tf-mpc [![Py Versions][py-versions.svg]][pypi-project] [![PyPI version][pypi-version.svg]][pypi-version] [![Build Status][travis.svg]][travis-project] [![License: GPL v3][license.svg]][license]
 
 
 # Quickstart
@@ -112,3 +112,16 @@ General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with tfmpc. If not, see http://www.gnu.org/licenses/.
+
+
+[py-versions.svg]: https://img.shields.io/pypi/pyversions/tfmpc.svg?logo=python&logoColor=white
+[pypi-project]: https://pypi.org/project/tfmpc
+
+[pypi-version.svg]: https://badge.fury.io/py/tfmpc.svg
+[pypi-version]: https://badge.fury.io/py/tfmpc
+
+[travis.svg]: https://img.shields.io/travis/thiagopbueno/tf-mpc/master.svg?logo=travis
+[travis-project]: https://travis-ci.org/thiagopbueno/tf-mpc
+
+[license.svg]: https://img.shields.io/badge/License-GPL%20v3-blue.svg
+[license]: https://github.com/thiagopbueno/tf-mpc/blob/master/LICENSE
