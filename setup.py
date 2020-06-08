@@ -52,7 +52,9 @@ setup(
         "tensorflow_probability",
         "sklearn",
         "pandas",
-        "pytest"
+        "psutil",
+        "pytest",
+        "tuneconfig"
     ],
     include_package_data=True,
     zip_safe=False,

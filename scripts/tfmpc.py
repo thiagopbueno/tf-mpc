@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import json
 import os
 
 import click
 import gym
 import numpy as np
+import psutil
 import tensorflow as tf
 import tensorflow.compat.v1.logging as tf_logging
+import tuneconfig
 
 from tfmpc import envs
-
 import tfmpc.solvers.lqr
-import tfmpc.solvers.ilqr
+from tfmpc.solvers import ilqr_run
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -125,7 +125,7 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
 
 
 @cli.command()
-@click.argument("config", type=click.Path(exists=True))
+@click.argument("env", type=click.Path(exists=True))
 @click.option(
     "--horizon", "-hr",
     type=click.IntRange(min=1),
@@ -145,20 +145,35 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     help="Maximum number of iterations.",
     show_default=True)
 @click.option(
-    "--output", "-o",
+    "--logdir",
     type=click.Path(),
-    help="Path to output file.")
+    default="/tmp/ilqr/",
+    help="Directory used for logging results.",
+    show_default=True)
+@click.option(
+    "--num-samples", "-ns",
+    type=click.IntRange(min=1),
+    default=1,
+    help="Number of runs.",
+    show_default=True)
+@click.option(
+    "--num-workers", "-nw",
+    type=click.IntRange(min=1, max=psutil.cpu_count()),
+    default=1,
+    help=f"Number of worker processes (min=1, max={psutil.cpu_count()}).",
+    show_default=True)
 @click.option(
     "--verbose", "-v",
     count=True,
     help="Verbosity level flag.")
-def ilqr(config, horizon, atol, max_iterations, output, verbose):
+def ilqr(**kwargs):
     """Run iLQR for a given environment and horizon.
 
     Args:
 
-        CONFIG: Path to the environment's config JSON file.
+        ENV: Path to the environment's config JSON file.
     """
+    verbose = kwargs["verbose"]
 
     if verbose == 1:
         level = tf_logging.INFO
@@ -169,22 +184,24 @@ def ilqr(config, horizon, atol, max_iterations, output, verbose):
 
     tf_logging.set_verbosity(level)
 
-    with open(config, "r") as file:
-        config = json.load(file)
+    def format_fn(param):
+        fmt = {
+            "env": None,
+            "logdir": None,
+            "num_samples": None,
+            "num_workers": None,
+            "verbose": None
+        }
+        return fmt.get(param, param)
 
-    env = envs.make_env(config)
-    print(env)
-    print()
+    config_it = tuneconfig.ConfigFactory(kwargs, format_fn)
 
-    x0 = tf.constant(config["initial_state"], dtype=tf.float32)
-    T = tf.constant(horizon)
+    runner = tuneconfig.Experiment(config_it, kwargs["logdir"])
+    runner.start()
 
-    solver = tfmpc.solvers.ilqr.iLQR(env, atol=atol)
-    trajectory, iterations = solver.solve(x0, T)
+    results = runner.run(ilqr_run, kwargs["num_samples"], kwargs["num_workers"])
 
-    print(repr(trajectory))
-    print()
-    print(str(trajectory))
-
-    if output:
-        trajectory.save(output)
+    for trial_id, runs in results.items():
+        for _, trajectory in runs:
+            print(repr(trajectory))
+            print(str(trajectory))
