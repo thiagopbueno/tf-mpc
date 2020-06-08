@@ -110,7 +110,7 @@ def test_forward(solver, initial_state, horizon):
 
 
 def test_solve(solver, initial_state, horizon):
-    trajectory, iterations = solver.solve(initial_state, horizon)
+    trajectory, iterations = solver.solve(initial_state, horizon, show_progress=False)
     #assert iterations == 2
     print()
     print(trajectory)

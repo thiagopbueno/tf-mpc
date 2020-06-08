@@ -13,6 +13,7 @@ import time
 import numpy as np
 import tensorflow as tf
 import tensorflow.compat.v1.logging as tf_logging
+from tuneconfig import experiment
 
 from tfmpc.utils import optimization
 from tfmpc.utils import trajectory
@@ -20,20 +21,22 @@ from tfmpc.utils import trajectory
 
 class iLQR:
 
-    def __init__(self, env, atol=5e-3, max_iterations=100, mu_min=1e-6, delta_0=2.0, c1=0.0, alpha_min=1e-3):
+    def __init__(self, env, **kwargs):
         self.env = env
 
         # solve
-        self.atol = atol
-        self.max_iterations = max_iterations
+        self.atol = kwargs.get("atol", 5e-3)
+        self.max_iterations = kwargs.get("max_iterations", 100)
 
         # backward
-        self.mu_min = mu_min
-        self.delta_0 = delta_0
+        self.mu_min = kwargs.get("mu_min", 1e-6)
+        self.delta_0 = kwargs.get("delta_0", 2.0)
 
         # forward
-        self.c1 = c1
-        self.alpha_min = alpha_min
+        self.c1 = kwargs.get("c1", 0.0)
+        self.alpha_min = kwargs.get("alpha_min", 1e-3)
+
+        self._config = kwargs
 
     @property
     def low(self):
@@ -196,62 +199,71 @@ class iLQR:
 
         return states.stack(), actions.stack(), costs.stack(), J, residual
 
-    def solve(self, x0, T):
+    def solve(self, x0, T, show_progress=True):
         mu = 0.0
         delta = 1.0
 
         x_hat, u_hat = self.start(x0, T)
 
-        for iteration in range(self.max_iterations):
-            tf_logging.info(f"[SOLVE] >>>>>>> Iteration = {iteration} <<<<<<<")
+        epochs = self.max_iterations
+        run_id = self._config.get("run_id", 0)
+        num_workers = self._config.get("num_workers", 1)
 
-            start = time.time()
+        with experiment.Experiment.trange(epochs, run_id, num_workers, show_progress=show_progress) as t:
 
-            # model approximation
-            transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
+            for iteration in t:
 
-            accept = False
-            converged = False
+                tf_logging.info(f"[SOLVE] >>>>>>> Iteration = {iteration} <<<<<<<")
 
-            while not accept:
-                # backward pass
-                K, k, J_hat, dV1, dV2 = self._backward(T, u_hat, transition_model, cost_model, final_cost_model, mu, delta)
+                start = time.time()
 
-                # check for termination due to small gradient
-                g_norm = tf.reduce_mean(tf.reduce_max(tf.abs(k) / (tf.abs(u_hat) + 1.0),axis=1), axis=0)[0]
-                tf_logging.debug(f"[SOLVE] g_norm = {g_norm:.6f}")
-                if g_norm < self.atol:
-                    tf_logging.debug(f"[SOLVE] CONVERGED: g_norm < atol ({g_norm:.4f} < {self.atol})")
-                    converged = True
+                # model approximation
+                transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
+
+                accept = False
+                converged = False
+
+                while not accept:
+                    # backward pass
+                    K, k, J_hat, dV1, dV2 = self._backward(T, u_hat, transition_model, cost_model, final_cost_model, mu, delta)
+
+                    # check for termination due to small gradient
+                    g_norm = tf.reduce_mean(tf.reduce_max(tf.abs(k) / (tf.abs(u_hat) + 1.0),axis=1), axis=0)[0]
+                    tf_logging.debug(f"[SOLVE] g_norm = {g_norm:.6f}")
+                    if g_norm < self.atol:
+                        tf_logging.debug(f"[SOLVE] CONVERGED: g_norm < atol ({g_norm:.4f} < {self.atol})")
+                        converged = True
+                        break
+
+                    # forward pass (backtracking line-search)
+                    done, x, u, c, residual = self._forward(x_hat, u_hat, J_hat, K, k, dV1, dV2)
+
+                    if residual < self.atol:
+                        tf_logging.debug(f"[SOLVE] CONVERGED: residual < atol ({residual:.6f} < {self.atol:.6f})")
+                        converged = True
+                        break
+
+                    if done:
+                        # decrease regularization
+                        delta = min(1 / self.delta_0, delta / self.delta_0)
+                        mu = mu * delta * (mu * delta > self.mu_min)
+
+                        # accept improvement
+                        x_hat, u_hat, c_hat = x, u, c
+                        accept = True
+                    else:
+                        # increase regularization
+                        delta = max(self.delta_0, delta * self.delta_0)
+                        mu = max(self.mu_min, mu * delta)
+
+                uptime = time.time() - start
+                tf_logging.info(f"[SOLVE] uptime = {uptime:.4f} sec")
+
+                # convergence test
+                if converged:
                     break
 
-                # forward pass (backtracking line-search)
-                done, x, u, c, residual = self._forward(x_hat, u_hat, J_hat, K, k, dV1, dV2)
-
-                if residual < self.atol:
-                    tf_logging.debug(f"[SOLVE] CONVERGED: residual < atol ({residual:.6f} < {self.atol:.6f})")
-                    converged = True
-                    break
-
-                if done:
-                    # decrease regularization
-                    delta = min(1 / self.delta_0, delta / self.delta_0)
-                    mu = mu * delta * (mu * delta > self.mu_min)
-
-                    # accept improvement
-                    x_hat, u_hat, c_hat = x, u, c
-                    accept = True
-                else:
-                    # increase regularization
-                    delta = max(self.delta_0, delta * self.delta_0)
-                    mu = max(self.mu_min, mu * delta)
-
-            uptime = time.time() - start
-            tf_logging.info(f"[SOLVE] uptime = {uptime:.4f} sec")
-
-            # convergence test
-            if converged:
-                break
+                t.set_postfix(J=f"{J_hat:.4f}", g_norm=f"{g_norm:.4f}", residual=f"{residual:.4f}")
 
         traj = trajectory.Trajectory(x_hat, u_hat, c_hat)
 
