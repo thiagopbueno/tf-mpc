@@ -7,7 +7,6 @@ For details please see:
 >> Tassa, Mansard, and Todorov (2014)
 """
 
-import pprint
 import time
 
 import numpy as np
@@ -62,6 +61,7 @@ class iLQR:
         for t in tf.range(T):
             state = states.read(t)
             action = tf.random.uniform([], minval=minval, maxval=maxval)
+
             state = self.env.transition(state, action)
 
             actions = actions.write(t, action)
@@ -209,7 +209,8 @@ class iLQR:
         run_id = self._config.get("run_id", 0)
         num_workers = self._config.get("num_workers", 1)
 
-        with experiment.Experiment.trange(epochs, run_id, num_workers, show_progress=show_progress) as t:
+        desc = f"horizon={int(T)}"
+        with experiment.Experiment.trange(epochs, run_id, num_workers, desc=desc, show_progress=show_progress) as t:
 
             for iteration in t:
 
