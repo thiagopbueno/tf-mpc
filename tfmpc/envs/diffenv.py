@@ -20,13 +20,14 @@ class DiffEnv:
         if batch:
             f_x = tape.batch_jacobian(f, state)
             f_u = tape.batch_jacobian(f, action)
+            f_x = tf.squeeze(f_x, axis=[2, 4])
+            f_u = tf.squeeze(f_u, axis=[2, 4])
         else:
             f_x, f_u = tape.jacobian(f, [state, action])
+            f_x = tf.squeeze(f_x)
+            f_u = tf.squeeze(f_u)
 
         del tape
-
-        f_x = tf.squeeze(f_x)
-        f_u = tf.squeeze(f_u)
 
         return TransitionApprox(f, f_x, f_u)
 
@@ -47,13 +48,17 @@ class DiffEnv:
             l_xu = tape.batch_jacobian(
                 l_x, action,
                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
+            l_xx = tf.squeeze(l_xx, axis=[2, 4])
+            l_xu = tf.squeeze(l_xu, axis=[2, 4])
+
         else:
             l_xx, l_xu = tape.jacobian(
                 l_x, [state, action],
                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        l_xx = tf.squeeze(l_xx)
-        l_xu = tf.squeeze(l_xu)
+            l_xx = tf.squeeze(l_xx)
+            l_xu = tf.squeeze(l_xu)
 
         if batch:
             l_ux = tape.batch_jacobian(
@@ -62,13 +67,16 @@ class DiffEnv:
             l_uu = tape.batch_jacobian(
                 l_u, action,
                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
+            l_ux = tf.squeeze(l_ux, axis=[2, 4])
+            l_uu = tf.squeeze(l_uu, axis=[2, 4])
         else:
             l_ux, l_uu = tape.jacobian(
                 l_u, [state, action],
                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
-        l_ux = tf.squeeze(l_ux)
-        l_uu = tf.squeeze(l_uu)
+            l_ux = tf.squeeze(l_ux)
+            l_uu = tf.squeeze(l_uu)
 
         del tape
 

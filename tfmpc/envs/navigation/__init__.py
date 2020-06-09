@@ -38,13 +38,13 @@ class Navigation(DiffEnv):
 
     @tf.function
     def cost(self, state, action, batch=False):
-        state = tf.squeeze(state)
+        state = tf.squeeze(state, axis=-1)
         goal = tf.squeeze(self.goal)
         return tf.reduce_sum((state - goal) ** 2, axis=-1)
 
     @tf.function
     def final_cost(self, state, batch=False):
-        state = tf.squeeze(state)
+        state = tf.squeeze(state, axis=-1)
         goal = tf.squeeze(self.goal)
         return tf.reduce_sum((state - goal) ** 2, axis=-1)
 

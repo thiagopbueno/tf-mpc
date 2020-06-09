@@ -105,7 +105,7 @@ class HVAC(DiffEnv):
         )
 
         return tf.reduce_sum(
-            tf.squeeze(air_cost + out_of_bounds_penalty + set_point_penalty),
+            tf.squeeze(air_cost + out_of_bounds_penalty + set_point_penalty, axis=-1),
             axis=-1
         )
 
@@ -124,7 +124,7 @@ class HVAC(DiffEnv):
         )
 
         return tf.reduce_sum(
-            tf.squeeze(out_of_bounds_penalty + set_point_penalty),
+            tf.squeeze(out_of_bounds_penalty + set_point_penalty, axis=-1),
             axis=-1
         )
 

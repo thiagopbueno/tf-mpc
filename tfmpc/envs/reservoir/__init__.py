@@ -63,7 +63,9 @@ class Reservoir(DiffEnv):
         c3 = self.SET_POINT_PENALTY * tf.abs((low + high) / 2.0 - rlevel)
 
         if batch:
-            total_cost = tf.reduce_sum(tf.squeeze(c1 + c2 + c3), axis=-1)
+            total_cost = tf.reduce_sum(
+                tf.squeeze(c1 + c2 + c3, axis=-1),
+                axis=-1)
         else:
             total_cost = tf.reduce_sum(c1 + c2 + c3)
 
