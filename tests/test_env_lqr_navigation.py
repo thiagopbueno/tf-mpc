@@ -2,14 +2,15 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from tfmpc.envs import navigation_lqr
+from tfmpc.envs.lqr import navigation
+
 
 
 @pytest.fixture
 def env():
     goal = tf.constant([[8.0], [-9.0]])
     beta = 5.0
-    return navigation_lqr.NavigationLQR(goal, beta)
+    return navigation.NavigationLQR(goal, beta)
 
 
 def test_transition(env):
