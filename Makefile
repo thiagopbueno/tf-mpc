@@ -6,6 +6,10 @@ init:
 	pip3 install -U pip setuptools
 	pip3 install pytest Sphinx pre-commit black
 
+clean:
+	find tfmpc/ tests/ -name "#*#" -delete -or -name "*~" -delete
+	find tfmpc/ tests/ -name "*.pyc" -delete
+
 docs:
 	sphinx-apidoc -f -o docs tf-mpc --ext-autodoc
 	[ -e "docs/_build/html" ] && rm -R docs/_build/html
