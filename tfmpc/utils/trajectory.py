@@ -1,7 +1,11 @@
 import os
+from collections import namedtuple
 
 import numpy as np
 import pandas as pd
+
+
+Transition = namedtuple("Transition", "state action cost")
 
 
 class Trajectory:
@@ -34,7 +38,7 @@ class Trajectory:
         return len(self.actions)
 
     def __getitem__(self, t):
-        return (self.states[t + 1], self.actions[t], self.costs[t])
+        return Transition(self.states[t + 1], self.actions[t], self.costs[t])
 
     def __repr__(self):
         init = self.initial_state
