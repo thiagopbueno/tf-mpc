@@ -39,7 +39,7 @@ def online_ilqr_run(config):
     T = tf.constant(config.pop("horizon"), dtype=tf.int32)
 
     solver = ilqr.iLQR(env, **config)
-    controller = agents.OnlineController(solver, T)
+    controller = agents.MPC(solver, T)
 
     runner = runners.Runner(env, controller)
     with runner(x0, T) as r:
@@ -47,4 +47,6 @@ def online_ilqr_run(config):
 
         output = os.path.join(config["logdir"], "data.csv")
         trajectory.save(output)
+
+    return env, trajectory
 
