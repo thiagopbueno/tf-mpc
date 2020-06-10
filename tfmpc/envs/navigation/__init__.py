@@ -3,11 +3,14 @@ import numpy as np
 import tensorflow as tf
 
 from tfmpc.envs.diffenv import DiffEnv
+from tfmpc.envs.gymenv import GymEnv
 
 
-class Navigation(DiffEnv):
+class Navigation(DiffEnv, GymEnv):
 
     def __init__(self, goal, deceleration, low, high):
+        super().__init__()
+
         self.goal = goal
         self.deceleration = deceleration
 
@@ -29,11 +32,18 @@ class Navigation(DiffEnv):
         return self.goal.shape[0]
 
     @tf.function
-    def transition(self, state, action, batch=False):
+    def transition(self, state, action, batch=False, cec=True):
         lambda_ = self._deceleration(state, batch)
         if batch:
             lambda_ = tf.reshape(lambda_, [tf.shape(lambda_)[0], 1, 1])
-        next_state = state + lambda_ * action
+
+        p = state + lambda_ * action
+
+        if cec:
+            next_state = p
+        else:
+            next_state = p + tf.random.truncated_normal(tf.shape(p), mean=0.0, stddev=0.2)
+
         return next_state
 
     @tf.function
