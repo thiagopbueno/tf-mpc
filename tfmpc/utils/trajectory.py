@@ -10,9 +10,9 @@ Transition = namedtuple("Transition", "state action cost")
 
 class Trajectory:
     def __init__(self, states, actions, costs):
-        self.states = np.squeeze(states.numpy())
-        self.actions = np.squeeze(actions.numpy())
-        self.costs = np.squeeze(costs.numpy())
+        self.states = np.squeeze(states.numpy(), axis=-1)
+        self.actions = np.squeeze(actions.numpy(), axis=-1)
+        self.costs = costs.numpy()
 
     @property
     def initial_state(self):
