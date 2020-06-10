@@ -13,7 +13,8 @@ import tuneconfig
 
 from tfmpc import envs
 import tfmpc.solvers.lqr
-from tfmpc.solvers import ilqr_run
+from tfmpc.launchers import online_ilqr_run
+from tfmpc.launchers import ilqr_run
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -127,6 +128,11 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
 @cli.command()
 @click.argument("env", type=click.Path(exists=True))
 @click.option(
+    "--online",
+    is_flag=True,
+    help="Online mode flag.",
+    show_default=True)
+@click.option(
     "--horizon", "-hr",
     type=click.IntRange(min=1),
     default=10,
@@ -199,7 +205,9 @@ def ilqr(**kwargs):
     runner = tuneconfig.Experiment(config_it, kwargs["logdir"])
     runner.start()
 
-    results = runner.run(ilqr_run, kwargs["num_samples"], kwargs["num_workers"])
+    exec_func = online_ilqr_run if kwargs["online"] else ilqr_run
+
+    results = runner.run(exec_func, kwargs["num_samples"], kwargs["num_workers"])
 
     for trial_id, runs in results.items():
         for _, trajectory in runs:
