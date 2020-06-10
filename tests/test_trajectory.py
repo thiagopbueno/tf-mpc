@@ -12,7 +12,7 @@ def trajectory():
 
     states = tf.random.normal(shape=(T + 1, state_size, 1))
     actions = tf.random.truncated_normal(shape=(T, action_size, 1))
-    costs = tf.random.uniform(shape=(T, 1), minval=-1.0, maxval=1.0)
+    costs = tf.random.uniform(shape=(T,), minval=-1.0, maxval=1.0)
 
     return Trajectory(states, actions, costs)
 
