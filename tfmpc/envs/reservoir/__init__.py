@@ -61,20 +61,18 @@ class Reservoir(DiffEnv, GymEnv):
         return rlevel_
 
     @tf.function
-    def cost(self, state, action, batch=tf.constant(False)):
+    def cost(self, state, action, batch=False):
         rlevel = state
 
         low = self.lower_bound
         high = self.upper_bound
 
-        c1 = self.LOW_PENALTY * tf.maximum(0.0, low - rlevel)
-        c2 = self.HIGH_PENALTY * tf.maximum(0.0, rlevel - high)
-        c3 = self.SET_POINT_PENALTY * tf.abs((low + high) / 2.0 - rlevel)
+        c1 = -self.low_penalty * tf.maximum(0.0, low - rlevel)
+        c2 = -self.high_penalty * tf.maximum(0.0, rlevel - high)
+        c3 = -self.set_point_penalty * tf.abs((low + high) / 2.0 - rlevel)
 
         if batch:
-            total_cost = tf.reduce_sum(
-                tf.squeeze(c1 + c2 + c3, axis=-1),
-                axis=-1)
+            total_cost = tf.reduce_sum(tf.squeeze(c1 + c2 + c3, axis=-1), axis=-1)
         else:
             total_cost = tf.reduce_sum(c1 + c2 + c3)
 
