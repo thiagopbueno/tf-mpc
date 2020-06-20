@@ -13,12 +13,13 @@ class GymEnv(gym.core.Env):
         self.horizon = horizon
 
     def step(self, action):
+        self._t += 1
+
         next_state = self.transition(self._state, action, cec=False)
         cost = self.cost(self._state, action)
-        done = (self._t == self.horizon - 1)
+        done = (self._t == self.horizon)
         info = self._info
 
-        self._t += 1
         self._state = next_state
 
         return (next_state, cost, done, info)
