@@ -29,7 +29,8 @@ def test_downstream(reservoir):
 
 
 def test_rain(reservoir):
-    assert tf.reduce_all(reservoir.rain >= 0.0)
+    rain_mean = reservoir.rain_shape * reservoir.rain_scale
+    assert tf.reduce_all(rain_mean >= 0.0)
 
 
 def test_vaporated(reservoir):
@@ -49,6 +50,15 @@ def test_vaporated_batch(reservoir):
     value = reservoir._vaporated(rlevel)
     assert value.shape == rlevel.shape
     assert tf.reduce_all(value > 0.0)
+
+
+def test_rainfall(reservoir):
+    rlevel = sample_state(reservoir)
+    rainfall = reservoir._rainfall(cec=True)
+    assert rainfall.shape == rlevel.shape
+
+    rainfall = reservoir._rainfall(cec=False)
+    assert rainfall.shape == rlevel.shape
 
 
 def test_inflow(reservoir):
@@ -122,7 +132,7 @@ def test_transition(reservoir):
 
     balance = (
         tf.reduce_sum(state)
-        + tf.reduce_sum(reservoir.rain)
+        + tf.reduce_sum(reservoir.rain_shape * reservoir.rain_scale)
         - tf.reduce_sum(reservoir._vaporated(state))
         - action[-1] * state[-1]
         - tf.reduce_sum(next_state)
