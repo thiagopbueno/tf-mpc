@@ -7,11 +7,12 @@ For details please see:
 >> Tassa, Mansard, and Todorov (2014)
 """
 
+import logging
+import os
 import time
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.compat.v1.logging as tf_logging
 from tuneconfig import experiment
 
 from tfmpc.utils import optimization
@@ -36,6 +37,10 @@ class iLQR:
         self.alpha_min = kwargs.get("alpha_min", 1e-3)
 
         self._config = kwargs
+
+        if "logdir" in self._config:
+            filename = os.path.join(self._config["logdir"], "trace.log")
+            logging.basicConfig(filename=filename, level=logging.DEBUG)
 
     @property
     def low(self):
@@ -82,7 +87,7 @@ class iLQR:
         cost_model = self.env.get_quadratic_cost(states[:-1], actions, batch=True)
         final_cost_model = self.env.get_quadratic_final_cost(states[-1])
         uptime = time.time() - start
-        tf_logging.info(f"[DERIVATIVES] uptime = {uptime:.6f}")
+        logging.info(f"[DERIVATIVES] uptime = {uptime:.6f}")
 
         return transition_model, cost_model, final_cost_model
 
@@ -210,7 +215,7 @@ class iLQR:
         mu = 0.0
         delta = 1.0
 
-        x_hat, u_hat = self.start(x0, T)
+        x_hat, u_hat, c_hat = self.start(x0, T)
 
         epochs = self.max_iterations
         run_id = self._config.get("run_id", 0)
@@ -221,25 +226,24 @@ class iLQR:
 
             for iteration in t:
 
-                tf_logging.info(f"[SOLVE] >>>>>>> Iteration = {iteration} <<<<<<<")
+                logging.info(f"[SOLVE] >>>>>>> Iteration = {iteration} <<<<<<<")
 
                 start = time.time()
 
                 # model approximation
                 transition_model, cost_model, final_cost_model = self.derivatives(x_hat, u_hat)
 
-                accept = False
                 converged = False
 
-                while not accept:
+                while True:
                     # backward pass
                     K, k, J_hat, dV1, dV2 = self._backward(T, u_hat, transition_model, cost_model, final_cost_model, mu, delta)
 
                     # check for termination due to small gradient
                     g_norm = tf.reduce_mean(tf.reduce_max(tf.abs(k) / (tf.abs(u_hat) + 1.0),axis=1), axis=0)[0]
-                    tf_logging.debug(f"[SOLVE] g_norm = {g_norm:.6f}")
+                    logging.debug(f"[SOLVE] g_norm = {g_norm:.6f}")
                     if g_norm < self.atol:
-                        tf_logging.debug(f"[SOLVE] CONVERGED: g_norm < atol ({g_norm:.4f} < {self.atol})")
+                        logging.debug(f"[SOLVE] CONVERGED: g_norm < atol ({g_norm:.4f} < {self.atol})")
                         converged = True
                         break
 
@@ -247,8 +251,9 @@ class iLQR:
                     done, x, u, c, residual = self._forward(x_hat, u_hat, J_hat, K, k, dV1, dV2)
 
                     if residual < self.atol:
-                        tf_logging.debug(f"[SOLVE] CONVERGED: residual < atol ({residual:.6f} < {self.atol:.6f})")
+                        logging.debug(f"[SOLVE] CONVERGED: residual < atol ({residual:.6f} < {self.atol:.6f})")
                         converged = True
+                        x_hat, u_hat, c_hat = x, u, c
                         break
 
                     if done:
@@ -258,14 +263,14 @@ class iLQR:
 
                         # accept improvement
                         x_hat, u_hat, c_hat = x, u, c
-                        accept = True
+                        break
                     else:
                         # increase regularization
                         delta = max(self.delta_0, delta * self.delta_0)
                         mu = max(self.mu_min, mu * delta)
 
                 uptime = time.time() - start
-                tf_logging.info(f"[SOLVE] uptime = {uptime:.4f} sec")
+                logging.info(f"[SOLVE] uptime = {uptime:.4f} sec")
 
                 # convergence test
                 if converged:
@@ -284,7 +289,7 @@ class iLQR:
 
         while not done:
             num_iter += 1
-            tf_logging.debug(f"[BACKWARD] num_iter = {num_iter}, mu = {mu}, delta = {delta}")
+            logging.debug(f"[BACKWARD] num_iter = {num_iter}, mu = {mu}, delta = {delta}")
 
             try:
                 start = time.time()
@@ -294,17 +299,17 @@ class iLQR:
 
                 done = True
 
-                tf_logging.info(f"[BACKWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec")
-                tf_logging.info(f"[BACKWARD] num_iter = {num_iter}, J_hat = {J_hat:.4f}")
+                logging.info(f"[BACKWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec")
+                logging.info(f"[BACKWARD] num_iter = {num_iter}, J_hat = {J_hat:.4f}")
 
             except tf.errors.InvalidArgumentError as e:
-                tf_logging.warn(f"[BACKWARD] could not run iLQR.backward : {e}")
+                logging.warn(f"[BACKWARD] could not run iLQR.backward : {e}")
 
                 delta = max(self.delta_0, delta * self.delta_0)
                 mu = max(self.mu_min, mu * delta)
 
             except Exception as e:
-                tf_logging.fatal(f"[BACKWARD] Error: {e}")
+                logging.fatal(f"[BACKWARD] Error: {e}")
                 exit(-1)
 
         return K, k, J_hat, dV1, dV2
@@ -317,15 +322,15 @@ class iLQR:
         for alpha in np.geomspace(1.0, self.alpha_min, 11):
             num_iter += 1
 
-            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, alpha = {alpha}")
+            logging.debug(f"[FORWARD] num_iter = {num_iter}, alpha = {alpha}")
 
             start = time.time()
             alpha_ = tf.constant(alpha, dtype=tf.float32)
             x, u, c, J, residual = self.forward(x_hat, u_hat, K, k, alpha_)
             uptime = time.time() - start
 
-            tf_logging.info(f"[FORWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec, J = {J:.4f}")
-            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, residual = {residual}")
+            logging.info(f"[FORWARD] num_iter = {num_iter}, uptime = {uptime:.4f} sec, J = {J:.4f}")
+            logging.debug(f"[FORWARD] num_iter = {num_iter}, residual = {residual}")
 
             # if residual < self.atol:
             #     accept = True
@@ -338,10 +343,10 @@ class iLQR:
                 z = dcost / delta_J
             else:
                 z = tf.sign(dcost)
-                tf_logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J:.4f}")
+                logging.warn(f"[FORWARD] Non-positive expected reduction: delta_J = {delta_J:.4f}")
 
-            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, dcost = {dcost}, delta_J = {delta_J:.4f}")
-            tf_logging.debug(f"[FORWARD] num_iter = {num_iter}, z = {z}, c1 = {self.c1}")
+            logging.debug(f"[FORWARD] num_iter = {num_iter}, dcost = {dcost}, delta_J = {delta_J:.4f}")
+            logging.debug(f"[FORWARD] num_iter = {num_iter}, z = {z}, c1 = {self.c1}")
 
             if z >= self.c1:
                 accept = True
