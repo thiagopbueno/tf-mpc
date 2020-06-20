@@ -140,6 +140,14 @@ def test_transition(reservoir):
     assert tf.abs(balance) < 1e-3
 
 
+def test_probabilistic_transition(reservoir):
+    state = sample_state(reservoir)
+    action = sample_action(reservoir)
+
+    next_state = reservoir.transition(state, action, batch=False, cec=False)
+    assert next_state.shape == state.shape
+
+
 def test_linear_transition_model(reservoir):
     state = sample_state(reservoir)
     action = sample_action(reservoir)
