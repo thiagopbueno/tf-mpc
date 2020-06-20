@@ -162,7 +162,7 @@ def test_linear_transition_model(reservoir):
 
     a_t = tf.squeeze(action)
     s_t = tf.squeeze(state)
-    C = reservoir.BIGGESTMAXCAP
+    C = tf.squeeze(reservoir.max_res_cap)
     grad_v_s = tf.linalg.diag(1/2 * (tf.cos(s_t/C) * s_t/C + tf.sin(s_t/C)))
     grad_F_s = tf.linalg.diag(a_t)
     grad_I_s = tf.matmul(reservoir.downstream, tf.linalg.diag(a_t), transpose_a=True)
@@ -183,6 +183,7 @@ def test_cost(reservoir):
 
     cost = reservoir.cost(state, action)
     assert cost.shape == []
+    assert cost >= 0.0
 
 
 def test_quadratic_cost_model(reservoir):
@@ -204,9 +205,9 @@ def test_quadratic_cost_model(reservoir):
     s_t = tf.squeeze(state)
     LB = tf.squeeze(reservoir.lower_bound)
     UB = tf.squeeze(reservoir.upper_bound)
-    HP = reservoir.HIGH_PENALTY
-    LP = reservoir.LOW_PENALTY
-    SPP = reservoir.SET_POINT_PENALTY
+    HP = -tf.squeeze(reservoir.high_penalty)
+    LP = -tf.squeeze(reservoir.low_penalty)
+    SPP = -tf.squeeze(reservoir.set_point_penalty)
 
     e1 = HP * tf.cast(((s_t - UB) > 0.0), tf.float32)
     e2 = -LP * tf.cast(((LB - s_t) > 0.0), tf.float32)
