@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import tensorflow as tf
 
@@ -80,8 +81,11 @@ def reservoir_fixture():
 
 
 def reservoir():
-    n_reservoirs = tf.random.uniform(
-        shape=[], minval=2, maxval=5, dtype=tf.int32)
+    n_reservoirs = np.random.randint(low=2, high=5)
+
+    max_res_cap = tf.constant(
+        [MAX_RES_CAP] * n_reservoirs,
+        shape=[n_reservoirs, 1], dtype=tf.float32)
 
     lower_bound = MAX_RES_CAP * tf.random.uniform(shape=[n_reservoirs, 1],
                                                   maxval=0.5,
@@ -90,13 +94,37 @@ def reservoir():
                                                   minval=0.5,
                                                   dtype=tf.float32)
 
-    downstream = linear_topology(int(n_reservoirs))
+    downstream = linear_topology(n_reservoirs)
 
-    rain = tf.random.gamma(
-        shape=[n_reservoirs, 1], alpha=20.0, beta=1.0)
+    rain_mean = 0.20 * MAX_RES_CAP
+    rain_variance = 0.05 * (MAX_RES_CAP ** 2)
+    rain_shape = tf.constant(
+        [(rain_mean ** 2) / rain_variance] * n_reservoirs,
+        shape=[n_reservoirs, 1],
+        dtype=tf.float32)
+    rain_scale = tf.constant(
+        [rain_variance / rain_mean] * n_reservoirs,
+        shape=[n_reservoirs, 1],
+        dtype=tf.float32)
 
-    return Reservoir(lower_bound, upper_bound, downstream, rain)
+    low_penalty = tf.constant(
+        [-5.0] * n_reservoirs,
+        shape=[n_reservoirs, 1],
+        dtype=tf.float32)
+    high_penalty = tf.constant(
+        [-100.0] * n_reservoirs,
+        shape=[n_reservoirs, 1],
+        dtype=tf.float32)
+    set_point_penalty = tf.constant(
+        [-0.1] * n_reservoirs,
+        shape=[n_reservoirs, 1],
+        dtype=tf.float32)
 
+    return Reservoir(
+        max_res_cap, lower_bound, upper_bound,
+        low_penalty, high_penalty, set_point_penalty,
+        downstream,
+        rain_shape, rain_scale)
 
 
 @pytest.fixture(params=[1, 2], ids=["1-zone", "2-zones"], name="navigation")
