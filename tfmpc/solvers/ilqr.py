@@ -48,6 +48,7 @@ class iLQR:
     @tf.function
     def start(self, x0, T):
         states = tf.TensorArray(dtype=tf.float32, size=T+1)
+        costs = tf.TensorArray(dtype=tf.float32, size=T+1)
         actions = tf.TensorArray(dtype=tf.float32, size=T)
 
         low = self.low
@@ -58,16 +59,22 @@ class iLQR:
 
         states = states.write(0, x0)
 
+        state = x0
+
         for t in tf.range(T):
-            state = states.read(t)
             action = tf.random.uniform([], minval=minval, maxval=maxval)
 
+            cost = self.env.cost(state, action)
             state = self.env.transition(state, action)
 
             actions = actions.write(t, action)
+            costs = costs.write(t, cost)
             states = states.write(t+1, state)
 
-        return states.stack(), actions.stack()
+        final_cost = self.env.final_cost(state)
+        costs = costs.write(T, final_cost)
+
+        return states.stack(), actions.stack(), costs.stack()
 
     def derivatives(self, states, actions):
         start = time.time()

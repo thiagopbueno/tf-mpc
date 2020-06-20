@@ -48,7 +48,7 @@ def solver(goal, beta, bounds):
 def test_start(solver, initial_state, horizon):
     x0 = initial_state
     T = horizon
-    states, actions = solver.start(x0, T)
+    states, actions, costs = solver.start(x0, T)
 
     assert isinstance(states, tf.Tensor)
     assert states.shape == [T + 1, *x0.shape]
@@ -63,7 +63,7 @@ def test_start(solver, initial_state, horizon):
 
 
 def test_derivatives(solver, initial_state, horizon):
-    states, actions = solver.start(initial_state, horizon)
+    states, actions, costs = solver.start(initial_state, horizon)
     models = solver.derivatives(states, actions)
 
     assert len(models) == 3
@@ -75,7 +75,7 @@ def test_derivatives(solver, initial_state, horizon):
 
 
 def test_backward(solver, initial_state, horizon):
-    states, actions = solver.start(initial_state, horizon)
+    states, actions, costs = solver.start(initial_state, horizon)
     transition_model, cost_model, final_cost_model = solver.derivatives(states, actions)
     K, k, J, dV1, dV2 = solver.backward(horizon, actions, transition_model, cost_model, final_cost_model)
 
@@ -90,7 +90,7 @@ def test_backward(solver, initial_state, horizon):
 
 
 def test_forward(solver, initial_state, horizon):
-    x, u = solver.start(initial_state, horizon)
+    x, u, c = solver.start(initial_state, horizon)
     transition_model, cost_model, final_cost_model = solver.derivatives(x, u)
     K, k, J, dV1, dV2 = solver.backward(horizon, u, transition_model, cost_model, final_cost_model)
     states, actions, costs, J_hat, residual = solver.forward(x, u, K, k)
