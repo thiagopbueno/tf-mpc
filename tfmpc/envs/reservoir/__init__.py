@@ -3,28 +3,35 @@ import numpy as np
 import tensorflow as tf
 
 from tfmpc.envs.diffenv import DiffEnv
+from tfmpc.envs.gymenv import GymEnv
 
 
-class Reservoir(DiffEnv):
-
-    BIGGESTMAXCAP = tf.constant(1000, dtype=tf.float32)
-
-    LOW_PENALTY = tf.constant(5.0, dtype=tf.float32)
-    HIGH_PENALTY = tf.constant(100.0, dtype=tf.float32)
-    SET_POINT_PENALTY = tf.constant(0.1, dtype=tf.float32)
+class Reservoir(DiffEnv, GymEnv):
 
     def __init__(self,
+                 max_res_cap,
                  lower_bound,
                  upper_bound,
+                 low_penalty,
+                 high_penalty,
+                 set_point_penalty,
                  downstream,
-                 rain):
+                 rain_shape,
+                 rain_scale):
+        super().__init__()
+
+        self.max_res_cap = max_res_cap
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
+        self.low_penalty = low_penalty
+        self.high_penalty = high_penalty
+        self.set_point_penalty = set_point_penalty
         self.downstream = downstream
-        self.rain = rain
+        self.rain_shape = rain_shape
+        self.rain_scale = rain_scale
 
         self.obs_space = gym.spaces.Box(
-            shape=[self.state_size, 1], low=0.0, high=self.BIGGESTMAXCAP.numpy())
+            low=np.zeros_like(self.max_res_cap), high=np.array(self.max_res_cap))
 
         self.action_space = gym.spaces.Box(
             shape=[self.action_size, 1], low=0.0, high=1.0)
