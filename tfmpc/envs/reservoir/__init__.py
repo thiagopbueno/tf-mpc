@@ -84,7 +84,7 @@ class Reservoir(DiffEnv, GymEnv):
 
     @tf.function
     def _vaporated(self, rlevel):
-        return (1.0 / 2.0) * tf.sin(rlevel / self.BIGGESTMAXCAP) * rlevel
+        return (1.0 / 2.0) * tf.sin(rlevel / self.max_res_cap) * rlevel
 
     @tf.function
     def _inflow(self, outflow):
