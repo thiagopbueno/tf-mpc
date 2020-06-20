@@ -45,15 +45,17 @@ class Reservoir(DiffEnv, GymEnv):
         return self.state_size
 
     @tf.function
-    def transition(self, state, action, batch=tf.constant(False)):
+    def transition(self, state, action, batch=False, cec=True):
         rlevel = state
         outflow = self._outflow(action, state)
 
         vaporated = self._vaporated(state)
 
+        rainfall = self._rainfall(cec)
+
         rlevel_ = (
             rlevel
-            + self.rain + self._inflow(outflow)
+            + rainfall + self._inflow(outflow)
             - vaporated - outflow
         )
         return rlevel_
@@ -94,6 +96,16 @@ class Reservoir(DiffEnv, GymEnv):
     def _outflow(self, relative_flow, rlevel):
         return relative_flow * rlevel
 
+    @tf.function
+    def _rainfall(self, cec=True):
+        if cec:
+            rainfall = self.rain_shape * self.rain_scale
+        else:
+            rainfall = tf.random.gamma(shape=[],
+                                       alpha=self.rain_shape,
+                                       beta=1/self.rain_scale)
+        return rainfall
+
     def __repr__(self):
         return f"Reservoir({self.state_size})"
 
@@ -104,8 +116,9 @@ class Reservoir(DiffEnv, GymEnv):
 
         topology = self.downstream
 
-        rain = ", ".join(f"{float(r):.2f}" for r in self.rain)
-        rain = f"[{rain}]"
+        rain = ", ".join(
+            f"Gamma(shape={float(shape):.2f}, scale={float(scale):.2f})"
+            for shape, scale in zip(self.rain_shape, self.rain_scale))
 
         return f"Reservoir(\nbounds={bounds},\ntopology=\n{topology},\nrain={rain})"
 
