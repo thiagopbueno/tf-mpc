@@ -15,6 +15,7 @@ import numpy as np
 import tensorflow as tf
 from tuneconfig import experiment
 
+from tfmpc.envs import diffenv
 from tfmpc.utils import optimization
 from tfmpc.utils import trajectory
 
@@ -50,7 +51,10 @@ class iLQR:
     def high(self):
         return tf.constant(self.env.action_space.high)
 
-    @tf.function
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=None, dtype=tf.int32)
+    ])
     def start(self, x0, T):
         states = tf.TensorArray(dtype=tf.float32, size=T+1)
         costs = tf.TensorArray(dtype=tf.float32, size=T+1)
@@ -81,18 +85,42 @@ class iLQR:
 
         return states.stack(), actions.stack(), costs.stack()
 
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32)
+    ])
     def derivatives(self, states, actions):
-        start = time.time()
-        transition_model = self.env.get_linear_transition(states[:-1], actions, batch=True)
-        cost_model = self.env.get_quadratic_cost(states[:-1], actions, batch=True)
+        transition_model = self.env.get_linear_transition(states[:-1], actions)
+        cost_model = self.env.get_quadratic_cost(states[:-1], actions)
         final_cost_model = self.env.get_quadratic_final_cost(states[-1])
-        uptime = time.time() - start
-        logging.info(f"[DERIVATIVES] uptime = {uptime:.6f}")
 
         return transition_model, cost_model, final_cost_model
 
-    @tf.function
-    def backward(self, T, actions, transition_model, cost_model, final_cost_model, mu=1.0):
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=None, dtype=tf.int32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        diffenv.TransitionApprox(
+            tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, None], dtype=tf.float32)
+        ),
+        diffenv.CostApprox(
+            tf.TensorSpec(shape=[None,], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, None], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None, None], dtype=tf.float32)
+        ),
+        diffenv.FinalCostApprox(
+            tf.TensorSpec(shape=None, dtype=tf.float32),
+            tf.TensorSpec(shape=[None, 1], dtype=tf.float32),
+            tf.TensorSpec(shape=[None, None], dtype=tf.float32)
+        ),
+        tf.TensorSpec(shape=None, dtype=tf.float32)
+    ])
+    def backward(self, T, actions, transition_model, cost_model, final_cost_model, mu):
         state_size = self.env.state_size
 
         K = tf.TensorArray(dtype=tf.float32, size=T)
@@ -171,9 +199,15 @@ class iLQR:
 
         return K.stack(), k.stack(), J, dV1, dV2
 
-    @tf.function
-    def forward(self, x, u, K, k, alpha=1.0):
-        T = x.shape[0] - 1
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, None], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=None, dtype=tf.float32)
+    ])
+    def forward(self, x, u, K, k, alpha):
+        T = tf.shape(x)[0] - 1
 
         states = tf.TensorArray(size=T+1, dtype=tf.float32)
         costs = tf.TensorArray(size=T+1, dtype=tf.float32)
