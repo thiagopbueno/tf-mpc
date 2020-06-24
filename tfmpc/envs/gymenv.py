@@ -1,4 +1,5 @@
 import gym.core
+import tensorflow as tf
 
 
 class GymEnv(gym.core.Env):
@@ -15,9 +16,15 @@ class GymEnv(gym.core.Env):
     def step(self, action):
         self._t += 1
 
-        next_state = self.transition(self._state, action, cec=False)
-        cost = self.cost(self._state, action)
+        cec = tf.constant(False)
+        state = tf.expand_dims(self._state, axis=0)
+        action = tf.expand_dims(action, axis=0)
+
+        next_state = tf.squeeze(self.transition(state, action, cec), axis=0)
+        cost = tf.squeeze(self.cost(state, action))
         done = (self._t == self.horizon)
+
+        self._info["total_cost"] += cost
         info = self._info
 
         self._state = next_state
@@ -27,7 +34,9 @@ class GymEnv(gym.core.Env):
     def reset(self):
         self._t = 0
         self._state = self.initial_state
-        self._info = {}
+        self._info = {
+            "total_cost": 0.0
+        }
 
         return self._state
 
