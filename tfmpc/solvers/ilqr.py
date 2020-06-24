@@ -70,11 +70,19 @@ class iLQR:
 
         state = x0
 
-        for t in tf.range(T):
-            action = tf.random.uniform([], minval=minval, maxval=maxval)
+        cec = tf.constant(True)
 
-            cost = self.env.cost(state, action)
-            state = self.env.transition(state, action)
+        for t in tf.range(T):
+            action = tf.random.uniform(shape=[], minval=minval, maxval=maxval)
+
+            state = tf.expand_dims(state, axis=0)
+            action = tf.expand_dims(action, axis=0)
+
+            cost = tf.squeeze(self.env.cost(state, action))
+            state = self.env.transition(state, action, cec)
+
+            state = tf.reshape(state, tf.shape(x0))
+            action = tf.squeeze(action, axis=0)
 
             actions = actions.write(t, action)
             costs = costs.write(t, cost)
@@ -213,15 +221,20 @@ class iLQR:
         costs = tf.TensorArray(size=T+1, dtype=tf.float32)
         actions = tf.TensorArray(size=T, dtype=tf.float32)
 
-        states = states.write(0, x[0])
+        x0 = x[0]
+        u0 = u[0]
+
+        states = states.write(0, x0)
 
         J = 0.0
 
-        state = x[0]
+        state = x0
         residual = tf.constant(0.0)
 
         low = self.low
         high = self.high
+
+        cec = tf.constant(True)
 
         for t in tf.range(T):
             delta_x = state - x[t]
@@ -229,8 +242,13 @@ class iLQR:
 
             action = u[t] + delta_u
             action = tf.clip_by_value(action, low, high)
-            cost = self.env.cost(state, action)
-            state = self.env.transition(state, action)
+
+            state = tf.expand_dims(state, axis=0)
+            action = tf.expand_dims(action, axis=0)
+            cost = tf.squeeze(self.env.cost(state, action))
+            state = self.env.transition(state, action, cec)
+            state = tf.reshape(state, tf.shape(x0))
+            action = tf.reshape(action, tf.shape(u0))
 
             actions = actions.write(t, action)
             costs = costs.write(t, cost)
