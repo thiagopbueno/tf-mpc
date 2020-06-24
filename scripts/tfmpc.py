@@ -133,6 +133,11 @@ def navlin(initial_state, goal, beta, horizon, debug, verbose):
     help="Online mode flag.",
     show_default=True)
 @click.option(
+    "--ignore-final-cost",
+    is_flag=True,
+    help="Ignore state-dependent final cost.",
+    show_default=True)
+@click.option(
     "--horizon", "-hr",
     type=click.IntRange(min=1),
     default=10,

@@ -88,7 +88,10 @@ class iLQR:
             costs = costs.write(t, cost)
             states = states.write(t+1, state)
 
-        final_cost = self.env.final_cost(state)
+        if self._config.get("ignore_final_cost"):
+            final_cost = tf.zeros_like(costs.read(0))
+        else:
+            final_cost = tf.squeeze(self.env.final_cost(state))
         costs = costs.write(T, final_cost)
 
         return states.stack(), actions.stack(), costs.stack()
@@ -134,10 +137,15 @@ class iLQR:
         K = tf.TensorArray(dtype=tf.float32, size=T)
         k = tf.TensorArray(dtype=tf.float32, size=T)
 
-        V_x = final_cost_model.l_x
-        V_xx = final_cost_model.l_xx
+        if self._config.get("ignore_final_cost"):
+            V_x = tf.zeros([state_size, 1])
+            V_xx = tf.zeros([state_size, state_size])
+            J = 0.0
+        else:
+            V_x = final_cost_model.l_x
+            V_xx = final_cost_model.l_xx
+            J = final_cost_model.l
 
-        J = final_cost_model.l
         dV1 = 0.0
         dV2 = 0.0
 
@@ -257,7 +265,10 @@ class iLQR:
             J += cost
             residual = tf.math.maximum(residual, tf.reduce_max(tf.abs(delta_u)))
 
-        final_cost = self.env.final_cost(state)
+        if self._config.get("ignore_final_cost"):
+            final_cost = tf.zeros_like(costs.read(0))
+        else:
+            final_cost = tf.squeeze(self.env.final_cost(state))
         costs = costs.write(T, final_cost)
         J += final_cost
 
