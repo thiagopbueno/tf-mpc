@@ -30,6 +30,13 @@ def ilqr_run(config):
 
 
 def online_ilqr_run(config):
+    import os
+
+    import psutil
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    os.environ["OMP_NUM_THREADS"] = str(psutil.cpu_count(logical=False))
+
     env_config = config.pop("env")
     with open(env_config, "r") as file:
         env_config = json.load(file)
