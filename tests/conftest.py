@@ -7,16 +7,16 @@ from tfmpc.envs.navigation import Navigation
 from tfmpc.envs.reservoir import Reservoir
 
 
-def sample_state(env, batch_size=None):
+def sample_state(env, batch_size=1):
     state_size = env.state_size
-    shape = [batch_size, state_size, 1] if batch_size else [state_size, 1]
-    return tf.random.normal(shape=shape, mean=10.0, dtype=tf.float32)
+    sample = [env.obs_space.sample() for _ in range(batch_size)]
+    return tf.stack(sample)
 
 
-def sample_action(env, batch_size=None):
+def sample_action(env, batch_size=1):
     action_size = env.action_size
-    shape = [batch_size, action_size, 1] if batch_size else [action_size, 1]
-    return tf.random.uniform(shape, dtype=tf.float32)
+    sample = [env.action_space.sample() for _ in range(batch_size)]
+    return tf.stack(sample)
 
 
 
