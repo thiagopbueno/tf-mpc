@@ -18,6 +18,7 @@ from tuneconfig import experiment
 from tfmpc.envs import diffenv
 from tfmpc.utils import optimization
 from tfmpc.utils import trajectory
+from tfmpc import loggers
 
 
 class iLQR:
@@ -37,11 +38,9 @@ class iLQR:
         self.c1 = kwargs.get("c1", 0.0)
         self.alpha_min = kwargs.get("alpha_min", 1e-3)
 
-        self._config = kwargs
+        self.logger = kwargs.get("logger", loggers.get_logger("py_logging", logdir=kwargs["logdir"]))
 
-        if "logdir" in self._config:
-            filename = os.path.join(self._config["logdir"], "trace.log")
-            logging.basicConfig(filename=filename, level=logging.DEBUG)
+        self._config = kwargs
 
     @property
     def low(self):

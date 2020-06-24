@@ -9,7 +9,10 @@ class MPC:
 
     def __call__(self, state, timestep):
         steps_to_go = self.horizon - timestep
-        trajectory, _ = self.solver.solve(state, steps_to_go)
+
+        trajectory, iterations = self.solver.solve(state, steps_to_go)
+        self.solver.logger.log(timestep, {"iterations": iterations})
+
         action = trajectory[0].action
         action = tf.constant(action[..., np.newaxis], dtype=tf.float32)
         return action

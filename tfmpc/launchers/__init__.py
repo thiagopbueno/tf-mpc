@@ -7,6 +7,7 @@ from tfmpc import agents
 from tfmpc import envs
 from tfmpc import runners
 from tfmpc.solvers import ilqr
+from tfmpc.loggers import get_logger
 
 
 def ilqr_run(config):
@@ -38,13 +39,18 @@ def online_ilqr_run(config):
     x0 = tf.constant(env_config["initial_state"], dtype=tf.float32)
     T = tf.constant(config.pop("horizon"), dtype=tf.int32)
 
+    logger = get_logger(config.get("logger", "py_logging"), config["logdir"])
+    config["logger"] = logger
+
     solver = ilqr.iLQR(env, **config)
     controller = agents.MPC(solver, T)
 
-    runner = runners.Runner(env, controller)
+    runner = runners.Runner(env, controller,
+                            on_step=logger.log_transition,
+                            on_episode_end=logger.summary)
+
     with runner(x0, T) as r:
         trajectory = r.run()
-
         output = os.path.join(config["logdir"], "data.csv")
         trajectory.save(output)
 
