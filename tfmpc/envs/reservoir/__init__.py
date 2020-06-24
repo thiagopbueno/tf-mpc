@@ -44,26 +44,77 @@ class Reservoir(DiffEnv, GymEnv):
     def action_size(self):
         return self.state_size
 
-    @tf.function
-    def transition(self, state, action, batch=False, cec=True):
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=None, dtype=tf.bool)
+    ])
+    def transition(self, state, action, cec):
         rlevel = state
+        batch_size = tf.shape(rlevel)[0]
+
         outflow = self._outflow(action, state)
+        inflow = self._inflow(outflow)
 
         vaporated = self._vaporated(state)
-
-        rainfall = self._rainfall(cec)
+        rainfall = self._rainfall(batch_size, cec)
 
         rlevel_ = (
             rlevel
-            + rainfall + self._inflow(outflow)
+            + rainfall + inflow
             - vaporated - outflow
         )
         return rlevel_
 
-    @tf.function
-    def cost(self, state, action, batch=False):
-        rlevel = state
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32)
+    ])
+    def cost(self, state, action):
+        return self._rlevel_penalty_cost(state)
 
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, 1], dtype=tf.float32)
+    ])
+    def final_cost(self, state):
+        state = tf.expand_dims(state, axis=0)
+        return tf.squeeze(self._rlevel_penalty_cost(state))
+
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32)
+    ])
+    def _vaporated(self, rlevel):
+        return (1.0 / 2.0) * tf.sin(rlevel / self.max_res_cap) * rlevel
+
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32)
+    ])
+    def _inflow(self, outflow):
+        return tf.matmul(self.downstream, outflow, transpose_a=True)
+
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32),
+    ])
+    def _outflow(self, relative_flow, rlevel):
+        return relative_flow * rlevel
+
+    @tf.function
+    def _rainfall(self, batch_size, cec=tf.constant(True)):
+        if cec:
+            rainfall = tf.reshape(
+                tf.tile(self.rain_shape * self.rain_scale, [batch_size, 1]),
+                shape=[batch_size, -1, 1])
+        else:
+            rainfall = tf.random.gamma(shape=[batch_size,],
+                                       alpha=self.rain_shape,
+                                       beta=1/self.rain_scale)
+        return rainfall
+
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None, None, 1], dtype=tf.float32)
+    ])
+    def _rlevel_penalty_cost(self, rlevel):
         low = self.lower_bound
         high = self.upper_bound
 
@@ -71,38 +122,8 @@ class Reservoir(DiffEnv, GymEnv):
         c2 = -self.high_penalty * tf.maximum(0.0, rlevel - high)
         c3 = -self.set_point_penalty * tf.abs((low + high) / 2.0 - rlevel)
 
-        if batch:
-            total_cost = tf.reduce_sum(tf.squeeze(c1 + c2 + c3, axis=-1), axis=-1)
-        else:
-            total_cost = tf.reduce_sum(c1 + c2 + c3)
-
-        return total_cost
-
-    @tf.function
-    def final_cost(self, state):
-        return self.cost(state, None)
-
-    @tf.function
-    def _vaporated(self, rlevel):
-        return (1.0 / 2.0) * tf.sin(rlevel / self.max_res_cap) * rlevel
-
-    @tf.function
-    def _inflow(self, outflow):
-        return tf.matmul(self.downstream, outflow, transpose_a=True)
-
-    @tf.function
-    def _outflow(self, relative_flow, rlevel):
-        return relative_flow * rlevel
-
-    @tf.function
-    def _rainfall(self, cec=True):
-        if cec:
-            rainfall = self.rain_shape * self.rain_scale
-        else:
-            rainfall = tf.random.gamma(shape=[],
-                                       alpha=self.rain_shape,
-                                       beta=1/self.rain_scale)
-        return rainfall
+        penalty = tf.reduce_sum(tf.squeeze(c1 + c2 + c3, axis=-1), axis=-1)
+        return penalty
 
     def __repr__(self):
         return f"Reservoir({self.state_size})"
