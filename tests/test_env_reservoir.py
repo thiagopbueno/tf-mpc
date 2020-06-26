@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from tests.conftest import sample_state, sample_action
 
+
 def test_repr(reservoir):
     print(repr(reservoir))
 
@@ -239,17 +240,13 @@ def test_cost(reservoir):
 
 
 def test_final_cost(reservoir):
-    batch_size = 10
-
-    state1 = sample_state(reservoir)
-    state2 = sample_state(reservoir, batch_size=batch_size)
+    state1 = sample_state(reservoir)[0]
+    state2 = sample_state(reservoir)[0]
 
     for state in [state1, state2]:
-        batch_size = tf.shape(state)[0]
-
         cost = reservoir.final_cost(state)
-        assert cost.shape == [batch_size,]
-        assert tf.reduce_all(cost >= 0.0)
+        assert cost.shape == []
+        assert cost >= 0.0
 
     fn = reservoir.final_cost
     cfn1 = fn.get_concrete_function(state1)
