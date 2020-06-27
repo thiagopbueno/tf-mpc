@@ -3,9 +3,10 @@ import numpy as np
 import tensorflow as tf
 
 from tfmpc.envs.diffenv import DiffEnv
+from tfmpc.envs.gymenv import GymEnv
 
 
-class HVAC(DiffEnv):
+class HVAC(DiffEnv, GymEnv):
 
     CAP_AIR = tf.constant(1.006, dtype=tf.float32)
     COST_AIR = tf.constant(1.0, dtype=tf.float32)
@@ -27,6 +28,8 @@ class HVAC(DiffEnv):
                  adj,
                  adj_outside,
                  adj_hall):
+
+        super().__init__()
 
         # temperature outside and hall
         self.temp_outside = temp_outside
